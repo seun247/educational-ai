@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduAI – Smart Educational Assistant</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#2563eb;--accent:#7c3aed;--green:#059669;--orange:#f59e0b;--bg:#f1f5f9;--white:#fff;--dark:#0f172a;--gray:#64748b;--border:#e2e8f0}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--dark);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));color:#fff;padding:0 20px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 16px rgba(0,0,0,.25);flex-shrink:0;height:64px}
+.logo{width:44px;height:44px;background:rgba(255,255,255,.18);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0}
+.header-text h1{font-size:1.15rem;font-weight:800;letter-spacing:.3px}
+.header-text p{font-size:.72rem;opacity:.8}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.api-status{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;transition:background .2s}
+.api-status:hover{background:rgba(255,255,255,.2)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0}
+.status-dot.connected{background:#4ade80;box-shadow:0 0 6px #4ade80}
+.status-dot.error{background:#f87171}
+.clear-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 14px;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;transition:background .2s}
+.clear-btn:hover{background:rgba(255,255,255,.22)}
+
+/* SUBJECT BAR */
+.subjects-bar{background:#fff;border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.subjects-bar::-webkit-scrollbar{display:none}
+.subj-btn{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;color:var(--dark)}
+.subj-btn:hover,.subj-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* API KEY MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:20px;padding:36px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h2{font-size:1.3rem;font-weight:800;color:var(--dark);margin-bottom:8px}
+.modal p{color:var(--gray);font-size:.9rem;line-height:1.6;margin-bottom:20px}
+.modal .steps{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:20px;font-size:.85rem;line-height:1.8;color:var(--dark)}
+.modal .steps a{color:var(--primary);font-weight:600}
+.modal input{width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 16px;font-size:.93rem;outline:none;transition:border-color .2s;margin-bottom:12px}
+.modal input:focus{border-color:var(--primary)}
+.modal-btns{display:flex;gap:10px}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:.9rem;font-weight:700;cursor:pointer;flex:1;transition:opacity .2s}
+.btn-primary:hover{opacity:.9}
+.btn-secondary{background:var(--bg);color:var(--gray);border:1px solid var(--border);border-radius:10px;padding:12px 24px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:var(--primary);color:var(--primary)}
+.modal-note{font-size:.75rem;color:var(--gray);margin-top:12px;text-align:center}
+
+/* CHAT */
+#chat{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:10px;max-width:860px;width:100%;animation:fadeIn .3s ease}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.avatar.ai{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff}
+.avatar.user{background:var(--green);color:#fff}
+.bubble{padding:13px 17px;border-radius:14px;font-size:.92rem;line-height:1.75;max-width:700px}
+.bubble.ai{background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px 14px 14px 2px}
+.bubble.user{background:var(--primary);color:#fff;border-radius:14px 14px 2px 14px}
+.bubble h3{font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:8px;margin-top:14px}
+.bubble h3:first-child{margin-top:0}
+.bubble.user h3{color:#fff}
+.bubble ul,.bubble ol{padding-left:20px;margin:6px 0}
+.bubble ul li,.bubble ol li{margin-bottom:5px}
+.bubble strong{font-weight:700}
+.bubble code{background:rgba(37,99,235,.1);color:var(--primary);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:.88rem}
+.bubble pre{background:#1e293b;color:#e2e8f0;padding:14px;border-radius:10px;overflow-x:auto;margin:10px 0;font-size:.83rem;line-height:1.6}
+.subject-tag{display:inline-block;background:rgba(37,99,235,.1);color:var(--primary);padding:3px 12px;border-radius:10px;font-size:.72rem;font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.typing{display:flex;gap:5px;align-items:center;padding:4px 0}
+.typing span{width:8px;height:8px;background:#94a3b8;border-radius:50%;animation:bounce .9s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+
+/* SUGGESTIONS */
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sug-btn{background:#fff;border:1px solid var(--border);border-radius:20px;padding:7px 15px;font-size:.78rem;cursor:pointer;transition:all .2s;color:var(--dark);font-weight:500}
+.sug-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* INPUT */
+.input-area{background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:flex-end;flex-shrink:0}
+#userInput{flex:1;border:2px solid var(--border);border-radius:12px;padding:11px 16px;font-size:.93rem;font-family:inherit;resize:none;max-height:130px;outline:none;transition:border-color .2s;line-height:1.5}
+#userInput:focus{border-color:var(--primary)}
+#userInput:disabled{background:#f8fafc;color:var(--gray)}
+.send-btn{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border:none;border-radius:12px;width:48px;height:48px;cursor:pointer;font-size:1.2rem;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.send-btn:hover{transform:scale(1.05)}
+.send-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  header{height:56px;padding:0 12px;gap:10px}
+  .logo{width:36px;height:36px;font-size:1.2rem}
+  .header-text h1{font-size:.95rem}
+  .header-text p{display:none}
+  .api-status{padding:4px 9px;font-size:.68rem;gap:4px}
+  .status-dot{width:6px;height:6px}
+  .clear-btn{padding:4px 10px;font-size:.68rem}
+  .clear-btn span{display:none}
+
+  .subjects-bar{padding:6px 10px;gap:6px}
+  .subj-btn{padding:4px 11px;font-size:.72rem}
+
+  #chat{padding:12px 10px;gap:12px}
+  .msg{max-width:100%}
+  .avatar{width:30px;height:30px;font-size:.9rem;border-radius:8px}
+  .bubble{padding:10px 13px;font-size:.87rem;max-width:calc(100% - 42px)}
+  .bubble h3{font-size:.93rem}
+  .bubble pre{font-size:.78rem;padding:10px}
+
+  .suggestions{gap:6px;margin-top:8px}
+  .sug-btn{padding:5px 11px;font-size:.74rem}
+
+  .input-area{padding:8px 10px;gap:8px}
+  #userInput{padding:9px 13px;font-size:.88rem;border-radius:10px}
+  .send-btn{width:42px;height:42px;font-size:1rem;border-radius:10px}
+
+  .modal{padding:22px 16px;border-radius:16px}
+  .modal h2{font-size:1.1rem}
+  .modal p{font-size:.85rem}
+  .modal .steps{font-size:.8rem;padding:12px}
+  .modal input{padding:10px 13px;font-size:.88rem}
+  .btn-primary{padding:11px 18px;font-size:.85rem}
+}
+
+@media(max-width:480px){
+  header{height:52px;padding:0 10px;gap:8px}
+  .logo{width:32px;height:32px;font-size:1rem}
+  .header-text h1{font-size:.88rem}
+  .api-status{padding:3px 8px;font-size:.65rem}
+  .clear-btn{padding:3px 8px;font-size:.65rem}
+
+  .subjects-bar{padding:5px 8px;gap:5px}
+  .subj-btn{padding:4px 10px;font-size:.7rem}
+
+  #chat{padding:10px 8px;gap:10px}
+  .avatar{width:28px;height:28px;font-size:.85rem}
+  .bubble{padding:9px 11px;font-size:.84rem;max-width:calc(100% - 38px)}
+  .bubble ul,.bubble ol{padding-left:14px}
+
+  .input-area{padding:7px 8px;gap:7px}
+  #userInput{padding:8px 11px;font-size:.85rem}
+  .send-btn{width:38px;height:38px;font-size:.95rem}
+
+  .modal{padding:18px 14px}
+  .modal h2{font-size:1rem}
+  .modal-btns{flex-direction:column}
+}
+
+@media(max-width:360px){
+  .header-text{display:none}
+  .subjects-bar{padding:4px 6px}
+  .subj-btn{padding:3px 9px;font-size:.67rem}
+  .bubble{font-size:.82rem}
+  .input-area{padding:6px}
+  #userInput{font-size:.82rem}
+}
+</style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>🔑 Connect to OpenRouter AI</h2>
+    <p>EduAI uses <strong>OpenRouter</strong> (free) to power answers across all subjects using top AI models.</p>
+    <div class="steps">
+      <b>Get your free API key:</b><br>
+      1. Go to <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a><br>
+      2. Sign up free<br>
+      3. Click <b>"Create Key"</b><br>
+      4. Copy and paste it below
+    </div>
+    <input type="password" id="apiKeyInput" placeholder="Paste your OpenRouter key (sk-or-...)" autocomplete="off">
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="saveApiKey()">Connect &amp; Start Learning</button>
+    </div>
+    <p class="modal-note">🔒 Your key is stored only in your browser. Never shared.</p>
+  </div>
+</div>
+
+<header>
+  <div class="logo">🎓</div>
+  <div class="header-text">
+    <h1>EduAI</h1>
+    <p>• Ask anything, any subject</p>
+  </div>
+  <div class="header-right">
+    <div class="api-status" id="apiStatus" onclick="showModal()">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Not Connected</span>
+    </div>
+    <button class="clear-btn" onclick="clearChat()">🗑 <span>Clear</span></button>
+  </div>
+</header>
+
+<div class="subjects-bar">
+  <button class="subj-btn active" onclick="setSubject('General',this)">🌐 General</button>
+  <button class="subj-btn" onclick="setSubject('Mathematics',this)">📐 Mathematics</button>
+  <button class="subj-btn" onclick="setSubject('Physics',this)">⚛️ Physics</button>
+  <button class="subj-btn" onclick="setSubject('Chemistry',this)">🧪 Chemistry</button>
+  <button class="subj-btn" onclick="setSubject('Biology',this)">🧬 Biology</button>
+  <button class="subj-btn" onclick="setSubject('English Language',this)">📖 English</button>
+  <button class="subj-btn" onclick="setSubject('History',this)">🏛️ History</button>
+  <button class="subj-btn" onclick="setSubject('Geography',this)">🌍 Geography</button>
+  <button class="subj-btn" onclick="setSubject('Computer Science',this)">💻 Computer</button>
+  <button class="subj-btn" onclick="setSubject('Economics',this)">📊 Economics</button>
+  <button class="subj-btn" onclick="setSubject('Civic Education',this)">🏛️ Civic</button>
+  <button class="subj-btn" onclick="setSubject('Literature',this)">📚 Literature</button>
+  <button class="subj-btn" onclick="setSubject('Agricultural Science',this)">🌱 Agriculture</button>
+  <button class="subj-btn" onclick="setSubject('Further Mathematics',this)">🔢 Further Maths</button>
+  <button class="subj-btn" onclick="setSubject('Technical Drawing',this)">📏 Tech Drawing</button>
+</div>
+
+<div id="chat"></div>
+
+<div style="background:#fff;border-top:1px solid var(--border);text-align:center;padding:5px;font-size:.7rem;color:#94a3b8;flex-shrink:0;">Powered by <strong style="color:var(--primary)">Berachah Global Concepts</strong></div>
+<div class="input-area">
+  <textarea id="userInput" rows="1" placeholder="Ask any question on any subject..." onkeydown="handleKey(event)" oninput="autoResize(this)" disabled></textarea>
+  <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>&#10148;</button>
+</div>
+
+<script>
+let apiKey = localStorage.getItem('eduai_or_key') || '';
+const _dk = '';
+if (!apiKey || !apiKey.startsWith('sk-or-')) {
+  // Add your OpenRouter API key here or enter it via the UI
+  apiKey = _dk || '';
+  if (apiKey) localStorage.setItem('eduai_or_key', apiKey);
+}
+let currentSubject = 'General';
+let isLoading = false;
+let chatHistory = [];
+
+const SYSTEM_PROMPT = `You are EduAI, an expert educational assistant for students from primary school to university level. 
+
+Your role:
+- Answer educational questions clearly, accurately, and in a student-friendly way
+- Provide step-by-step explanations for problems (especially maths and science)
+- Use examples, analogies, and real-world applications to explain concepts
+- Format responses with clear headings, bullet points, and numbered steps where helpful
+- For maths: show full working/steps
+- For science: include formulas, diagrams described in text, and examples
+- Adapt your language to the student's apparent level
+- Always be encouraging and supportive
+- Cover ALL academic subjects: Mathematics, Physics, Chemistry, Biology, English, History, Geography, Computer Science, Economics, Civic Education, Literature, Agriculture, Further Maths, Technical Drawing, and more
+- When asked about a specific subject, focus your answer on that subject context
+
+Current subject focus: `;
+
+// Suggestions per subject
+const SUGGESTIONS = {
+  'General': ['What is the water cycle?', 'Explain Newton\'s laws', 'What causes earthquakes?', 'How does the heart work?'],
+  'Mathematics': ['Solve x² - 5x + 6 = 0', 'Explain differentiation', 'What is a matrix?', 'How to find the area of a circle?'],
+  'Physics': ['What is Ohm\'s Law?', 'Explain projectile motion', 'What is electromagnetic induction?', 'How does a transformer work?'],
+  'Chemistry': ['What is the mole concept?', 'Explain ionic bonding', 'What is electrolysis?', 'How does titration work?'],
+  'Biology': ['Explain mitosis vs meiosis', 'What is the immune system?', 'How does the kidney work?', 'What is natural selection?'],
+  'English Language': ['What are figures of speech?', 'Explain passive voice', 'How to write a good essay?', 'What is a clause?'],
+  'History': ['What caused World War 1?', 'Explain the Cold War', 'When did Nigeria gain independence?', 'What was the slave trade?'],
+  'Geography': ['What are tectonic plates?', 'Explain climate change', 'What is urbanization?', 'Describe the water cycle'],
+  'Computer Science': ['What is an algorithm?', 'Explain binary numbers', 'What is object-oriented programming?', 'How does the internet work?'],
+  'Economics': ['What is supply and demand?', 'Explain inflation', 'What is GDP?', 'What is opportunity cost?'],
+  'Literature': ['Analyze Romeo and Juliet', 'What is a soliloquy?', 'Explain themes in Things Fall Apart', 'What is dramatic irony?'],
+  'Agricultural Science': ['What is crop rotation?', 'Explain soil types', 'What is photosynthesis in farming?', 'Types of farming systems'],
+  'Further Mathematics': ['Explain complex numbers', 'What is a differential equation?', 'Explain vectors in 3D', 'What is integration by parts?'],
+};
+
+function init() {
+  if (apiKey) {
+    document.getElementById('apiModal').style.display = 'none';
+    setConnected(true);
+    enableInput();
+  }
+  showWelcome();
+}
+
+function showWelcome() {
+  const suggs = SUGGESTIONS['General'];
+  let suggHtml = suggs.map(s => `<button class="sug-btn" onclick="askSuggestion('${s.replace(/'/g,"\\'")}')">💡 ${s}</button>`).join('');
+  addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>Hello! I'm EduAI 👋</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more<br><br>Try a question below:<div class="suggestions">${suggHtml}</div>`);
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key || !key.startsWith('sk-or-')) {
+    alert('Please enter a valid OpenRouter API key (starts with sk-or-...)');
+    return;
+  }
+  apiKey = key;
+  localStorage.setItem('eduai_or_key', key);
+  document.getElementById('apiModal').style.display = 'none';
+  setConnected(true);
+  enableInput();
+  addMsg('ai', '<span class="subject-tag">✅ Connected</span><h3>OpenRouter connected!</h3>You\'re now powered by <strong>LLaMA 3.1 via OpenRouter</strong>. Ask me anything on any subject!');
+}
+
+function closeModal() {
+  document.getElementById('apiModal').style.display = 'none';
+  addMsg('ai', '<span class="subject-tag">⚠️ Demo Mode</span><h3>Running in Demo Mode</h3>To unlock full AI-powered answers on any topic, click <strong>"Not Connected"</strong> at the top to add your API key.');
+}
+
+function showModal() {
+  document.getElementById('apiModal').style.display = 'flex';
+}
+
+function setConnected(ok) {
+  document.getElementById('statusDot').className = 'status-dot ' + (ok ? 'connected' : 'error');
+  document.getElementById('statusText').textContent = ok ? 'AI Connected' : 'Not Connected';
+}
+
+function enableInput() {
+  document.getElementById('userInput').disabled = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('userInput').placeholder = 'Ask any question on any subject...';
+}
+
+function setSubject(subj, el) {
+  currentSubject = subj;
+  document.querySelectorAll('.subj-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const suggs = SUGGESTIONS[subj] || SUGGESTIONS['General'];
+  let suggHtml = suggs.map(s => `<button class="sug-btn" onclick="askSuggestion('${s.replace(/'/g,"\\'")}')">💡 ${s}</button>`).join('');
+  addMsg('ai', `<span class="subject-tag">📚 ${subj}</span><h3>Switched to ${subj}</h3>I'm now focused on <strong>${subj}</strong>. Ask me anything about this subject — from basics to advanced topics.<div class="suggestions">${suggHtml}</div>`);
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 130) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function addMsg(role, html) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const av = document.createElement('div');
+  av.className = 'avatar ' + role;
+  av.textContent = role === 'ai' ? '🎓' : '👤';
+  const bub = document.createElement('div');
+  bub.className = 'bubble ' + role;
+  bub.innerHTML = html;
+  div.appendChild(av);
+  div.appendChild(bub);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return bub;
+}
+
+function showTyping() {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-ind';
+  div.innerHTML = '<div class="avatar ai">🎓</div><div class="bubble ai"><div class="typing"><span></span><span></span><span></span></div></div>';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-ind');
+  if (t) t.remove();
+}
+
+function formatResponse(text) {
+  // Convert markdown-like formatting to HTML
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre>$1</pre>');
+  text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  text = text.replace(/^# (.+)$/gm, '<h3>$1</h3>');
+  // Convert bullet lists
+  text = text.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>');
+  // Convert numbered lists
+  text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Line breaks
+  text = text.replace(/\n\n/g, '<br><br>');
+  text = text.replace(/\n/g, '<br>');
+  return text;
+}
+
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('userInput');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = ''; input.style.height = 'auto';
+
+  addMsg('user', q);
+  chatHistory.push({ role: 'user', content: q });
+
+  if (!apiKey) {
+    addMsg('ai', '<span class="subject-tag">⚠️ No API Key</span>Please click <strong>"Not Connected"</strong> at the top to add your free Groq API key and unlock full AI answers.');
+    return;
+  }
+
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  showTyping();
+
+  try {
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT + currentSubject + '. Always give thorough, educational responses.' }
+    ];
+    // Include recent history
+    if (chatHistory.length > 0) {
+      chatHistory.slice(-10).forEach(m => messages.push(m));
+    } else {
+      messages.push({ role: 'user', content: q });
+    }
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://eduai.app',
+        'X-Title': 'EduAI'
+      },
+      body: JSON.stringify({
+        model: 'openrouter/free',
+        messages,
+        temperature: 0.7,
+        max_tokens: 2048
+      })
+    });
+
+    const data = await res.json();
+    removeTyping();
+
+    if (data.error) {
+      const errMsg = data.error.message || 'API error';
+      if (errMsg.includes('invalid_api_key') || errMsg.includes('Unauthorized')) {
+        setConnected(false);
+        addMsg('ai', '<span class="subject-tag">❌ Invalid Key</span><h3>API Key Error</h3>Your Groq API key is invalid. Click <strong>"Not Connected"</strong> to update it.');
+      } else if (errMsg.includes('rate_limit') || errMsg.includes('quota')) {
+        addMsg('ai', `<span class="subject-tag">⏳ Rate Limit</span><h3>Too many requests</h3>Please wait a moment and try again.<br><br><button class="sug-btn" onclick="showModal()" style="background:var(--primary);color:#fff;border-color:var(--primary)">🔑 Update API Key</button>`);
+      } else {
+        addMsg('ai', `<span class="subject-tag">❌ Error</span><h3>Something went wrong</h3>${errMsg}`);
+      }
+    } else {
+      const answer = data.choices?.[0]?.message?.content || 'No response received.';
+      const formatted = formatResponse(answer);
+      addMsg('ai', `<span class="subject-tag">📚 ${currentSubject}</span>${formatted}`);
+      chatHistory.push({ role: 'assistant', content: answer });
+      if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+    }
+  } catch (err) {
+    removeTyping();
+    addMsg('ai', '<span class="subject-tag">❌ Network Error</span><h3>Connection failed</h3>Check your internet connection and try again.');
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('userInput').focus();
+}
+
+function askSuggestion(q) {
+  document.getElementById('userInput').value = q;
+  if (apiKey) sendMessage();
+  else {
+    addMsg('user', q);
+    addMsg('ai', '<span class="subject-tag">⚠️ No API Key</span>Click <strong>"Not Connected"</strong> at the top to add your API key and unlock full AI answers.');
+  }
+}
+
+function clearChat() {
+  document.getElementById('chat').innerHTML = '';
+  chatHistory = [];
+  showWelcome();
+}
+
+init();
+</script>
+</body>
+</html>
