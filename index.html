@@ -24,10 +24,7 @@ header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));c
 .clear-btn:hover{background:rgba(255,255,255,.22)}
 
 /* SUBJECT BAR */
-.subjects-bar{background:#fff;border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;scrollbar-width:none}
-.subjects-bar::-webkit-scrollbar{display:none}
-.subj-btn{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;color:var(--dark)}
-.subj-btn:hover,.subj-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.subjects-bar{background:#fff;border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:10px;align-items:center;flex-shrink:0}
 
 /* API KEY MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -181,33 +178,32 @@ header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));c
   <div class="logo">🎓</div>
   <div class="header-text">
     <h1>EduAI</h1>
-    <p>• Ask anything, any subject</p>
+    <p>• Ask anything on any subject</p>
   </div>
   <div class="header-right">
-    <div class="api-status" id="apiStatus" onclick="showModal()">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusText">Not Connected</span>
-    </div>
     <button class="clear-btn" onclick="clearChat()">🗑 <span>Clear</span></button>
   </div>
 </header>
 
 <div class="subjects-bar">
-  <button class="subj-btn active" onclick="setSubject('General',this)">🌐 General</button>
-  <button class="subj-btn" onclick="setSubject('Mathematics',this)">📐 Mathematics</button>
-  <button class="subj-btn" onclick="setSubject('Physics',this)">⚛️ Physics</button>
-  <button class="subj-btn" onclick="setSubject('Chemistry',this)">🧪 Chemistry</button>
-  <button class="subj-btn" onclick="setSubject('Biology',this)">🧬 Biology</button>
-  <button class="subj-btn" onclick="setSubject('English Language',this)">📖 English</button>
-  <button class="subj-btn" onclick="setSubject('History',this)">🏛️ History</button>
-  <button class="subj-btn" onclick="setSubject('Geography',this)">🌍 Geography</button>
-  <button class="subj-btn" onclick="setSubject('Computer Science',this)">💻 Computer</button>
-  <button class="subj-btn" onclick="setSubject('Economics',this)">📊 Economics</button>
-  <button class="subj-btn" onclick="setSubject('Civic Education',this)">🏛️ Civic</button>
-  <button class="subj-btn" onclick="setSubject('Literature',this)">📚 Literature</button>
-  <button class="subj-btn" onclick="setSubject('Agricultural Science',this)">🌱 Agriculture</button>
-  <button class="subj-btn" onclick="setSubject('Further Mathematics',this)">🔢 Further Maths</button>
-  <button class="subj-btn" onclick="setSubject('Technical Drawing',this)">📏 Tech Drawing</button>
+  <label style="font-size:.8rem;font-weight:600;color:#475569;white-space:nowrap;align-self:center;">📚 Subject:</label>
+  <select id="subjectSelect" onchange="setSubjectFromSelect(this)" style="flex:1;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;font-size:.82rem;font-family:inherit;outline:none;background:#f8fafc;color:#0f172a;cursor:pointer;max-width:280px;">
+    <option value="General">🌐 General</option>
+    <option value="Mathematics">📐 Mathematics</option>
+    <option value="Physics">⚛️ Physics</option>
+    <option value="Chemistry">🧪 Chemistry</option>
+    <option value="Biology">🧬 Biology</option>
+    <option value="English Language">📖 English Language</option>
+    <option value="History">🏛️ History</option>
+    <option value="Geography">🌍 Geography</option>
+    <option value="Computer Science">💻 Computer Science</option>
+    <option value="Economics">📊 Economics</option>
+    <option value="Civic Education">🏛️ Civic Education</option>
+    <option value="Literature">📚 Literature</option>
+    <option value="Agricultural Science">🌱 Agricultural Science</option>
+    <option value="Further Mathematics">🔢 Further Mathematics</option>
+    <option value="Technical Drawing">📏 Technical Drawing</option>
+  </select>
 </div>
 
 <div id="chat"></div>
@@ -289,7 +285,7 @@ function saveApiKey() {
   document.getElementById('apiModal').style.display = 'none';
   setConnected(true);
   enableInput();
-  addMsg('ai', '<span class="subject-tag">✅ Connected</span><h3>OpenRouter connected!</h3>You\'re now powered by <strong>LLaMA 3.1 via OpenRouter</strong>. Ask me anything on any subject!');
+  addMsg('', '<span class="subject-tag"></span><h3>OpenRouter connected!</h3>You\'re now powered by <strong>LLaMA 3.1 via OpenRouter</strong>. Ask me anything on any subject!');
 }
 
 function closeModal() {
@@ -302,8 +298,7 @@ function showModal() {
 }
 
 function setConnected(ok) {
-  document.getElementById('statusDot').className = 'status-dot ' + (ok ? 'connected' : 'error');
-  document.getElementById('statusText').textContent = ok ? 'AI Connected' : 'Not Connected';
+  // status badge removed — no UI update needed
 }
 
 function enableInput() {
@@ -312,10 +307,14 @@ function enableInput() {
   document.getElementById('userInput').placeholder = 'Ask any question on any subject...';
 }
 
-function setSubject(subj, el) {
+function setSubjectFromSelect(el) {
+  setSubject(el.value);
+}
+
+function setSubject(subj) {
   currentSubject = subj;
-  document.querySelectorAll('.subj-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
+  const sel = document.getElementById('subjectSelect');
+  if (sel) sel.value = subj;
   const suggs = SUGGESTIONS[subj] || SUGGESTIONS['General'];
   let suggHtml = suggs.map(s => `<button class="sug-btn" onclick="askSuggestion('${s.replace(/'/g,"\\'")}')">💡 ${s}</button>`).join('');
   addMsg('ai', `<span class="subject-tag">📚 ${subj}</span><h3>Switched to ${subj}</h3>I'm now focused on <strong>${subj}</strong>. Ask me anything about this subject — from basics to advanced topics.<div class="suggestions">${suggHtml}</div>`);
