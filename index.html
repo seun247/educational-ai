@@ -77,7 +77,7 @@ header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));c
 .sug-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
 
 /* INPUT */
-.input-area{background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:flex-end;flex-shrink:0}
+.input-area{background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:flex-end;flex-shrink:0;min-height:64px}
 #userInput{flex:1;border:2px solid var(--border);border-radius:12px;padding:11px 16px;font-size:.93rem;font-family:inherit;resize:none;max-height:130px;outline:none;transition:border-color .2s;line-height:1.5}
 #userInput:focus{border-color:var(--primary)}
 #userInput:disabled{background:#f8fafc;color:var(--gray)}
@@ -214,8 +214,8 @@ header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));c
 
 <div style="background:#fff;border-top:1px solid var(--border);text-align:center;padding:5px;font-size:.7rem;color:#94a3b8;flex-shrink:0;">Powered by <strong style="color:var(--primary)">Berachah Global Concepts</strong></div>
 <div class="input-area">
-  <textarea id="userInput" rows="1" placeholder="Ask any question on any subject..." onkeydown="handleKey(event)" oninput="autoResize(this)" disabled></textarea>
-  <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>&#10148;</button>
+  <textarea id="userInput" rows="1" placeholder="Ask any question on any subject..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#10148;</button>
 </div>
 
 <script>
