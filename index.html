@@ -212,11 +212,11 @@ header{background:linear-gradient(135deg,#1e3a8a,var(--primary),var(--accent));c
 
 <div id="chat"></div>
 
-<div style="background:#fff;border-top:1px solid var(--border);text-align:center;padding:5px;font-size:.7rem;color:#94a3b8;flex-shrink:0;">Powered by <strong style="color:var(--primary)">Berachah Global Concepts</strong></div>
 <div class="input-area">
   <textarea id="userInput" rows="1" placeholder="Ask any question on any subject..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
   <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#10148;</button>
 </div>
+<div style="background:#fff;text-align:center;padding:4px;font-size:.68rem;color:#94a3b8;flex-shrink:0;">Powered by <strong style="color:var(--primary)">Berachah Global Concepts</strong></div>
 
 <script>
 let apiKey = localStorage.getItem('eduai_or_key') || '';
