@@ -47,6 +47,9 @@ header{
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid rgba(255,255,255,.12);
   color:#f8fafc;
+  position:sticky;
+  top:0;
+  z-index:1100;
 }
 .header-text{min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
 .header-text h1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -466,7 +469,8 @@ body.history-drawer-open .history-sidebar{
 }
 
 @media(max-width:360px){
-  .header-text{display:none}
+  /* Keep header text visible on very small screens so the header shows */
+  .header-text{display:flex;flex-direction:column;align-items:center;justify-content:center}
 }
 </style>
 </head>
