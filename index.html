@@ -625,7 +625,8 @@ function formatHistoryTime(t) {
 function recordQaExchange(token, questionText, answerText, subject) {
   const qPrev = truncatePreview(questionText, 220);
   const aPrev = truncatePreview(stripForPreview(answerText), 300);
-  qaHistory.unshift({ token, q: qPrev, a: aPrev, subject: subject || '', t: Date.now() });
+  // store both preview and full content so history items can be re-displayed
+  qaHistory.unshift({ token, q: qPrev, a: aPrev, qFull: String(questionText || ''), aFull: String(answerText || ''), subject: subject || '', t: Date.now() });
   while (qaHistory.length > 100) qaHistory.pop();
   persistQaHistory();
   renderHistorySidebar();
@@ -689,11 +690,63 @@ function renderHistorySidebar() {
 
 function scrollToQaAnchor(token) {
   closeHistoryDrawer();
-  const el = document.getElementById('qa-' + token);
-  if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  el.classList.add('qa-highlight');
-  setTimeout(() => el.classList.remove('qa-highlight'), 1400);
+  const chat = document.getElementById('chat');
+  const existingUserEl = document.getElementById('qa-' + token);
+  const existingAiEl = document.getElementById('qa-' + token + '-a');
+  // If the chat already contains the Q/A, expand existing entries to full text then scroll
+  const entry = qaHistory.find(e => e.token === token);
+  if (existingUserEl || existingAiEl) {
+    if (entry) {
+      if (existingUserEl) {
+        const userBubble = existingUserEl.querySelector('.bubble.user');
+        if (userBubble) userBubble.textContent = entry.qFull || entry.q || '';
+      }
+      if (existingAiEl) {
+        const aiBubble = existingAiEl.querySelector('.bubble.ai');
+        if (aiBubble) aiBubble.innerHTML = formatResponse(entry.aFull || entry.a || '');
+      }
+    }
+    const el = existingAiEl || existingUserEl;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('qa-highlight');
+    setTimeout(() => el.classList.remove('qa-highlight'), 1400);
+    return;
+  }
+
+  // Otherwise re-insert the full Q/A into the chat area
+  if (!entry) return;
+
+  // create user bubble (question)
+  const userDiv = document.createElement('div');
+  userDiv.className = 'msg user';
+  userDiv.id = 'qa-' + token;
+  const uAv = document.createElement('div');
+  uAv.className = 'avatar user';
+  uAv.textContent = '👤';
+  const uBub = document.createElement('div');
+  uBub.className = 'bubble user';
+  uBub.textContent = entry.qFull || entry.q || '';
+  userDiv.appendChild(uAv);
+  userDiv.appendChild(uBub);
+
+  // create AI bubble (answer)
+  const aiDiv = document.createElement('div');
+  aiDiv.className = 'msg ai';
+  aiDiv.id = 'qa-' + token + '-a';
+  const aAv = document.createElement('div');
+  aAv.className = 'avatar ai';
+  aAv.textContent = '🎓';
+  const aBub = document.createElement('div');
+  aBub.className = 'bubble ai';
+  aBub.innerHTML = formatResponse(entry.aFull || entry.a || '');
+  aiDiv.appendChild(aAv);
+  aiDiv.appendChild(aBub);
+
+  chat.appendChild(userDiv);
+  chat.appendChild(aiDiv);
+  aiDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  aiDiv.classList.add('qa-highlight');
+  setTimeout(() => aiDiv.classList.remove('qa-highlight'), 1400);
 }
 
 function toggleHistoryDrawer() {
@@ -1330,6 +1383,27 @@ function formatResponse(text) {
   return text;
 }
 
+// Replace common math words/LaTeX with compact symbols
+function symbolizeMath(s) {
+  if (!s) return s;
+  let out = String(s);
+  // handle LaTeX-like \frac{a}{b} and frac{a}{b}
+  out = out.replace(/\\?frac\s*\{\s*([^}]+)\s*\}\s*\{\s*([^}]+)\s*\}/g, (_, a, b) => `${a}⁄${b}`);
+  // handle frac(a,b)
+  out = out.replace(/frac\s*\(\s*([^,]+)\s*,\s*([^\)]+)\s*\)/g, (_, a, b) => `${a}⁄${b}`);
+  // sqrt{...} or sqrt(...)
+  out = out.replace(/\\?sqrt\s*\{\s*([^}]+)\s*\}/g, (_, a) => `√(${a})`);
+  out = out.replace(/\\?sqrt\s*\(\s*([^\)]+)\s*\)/g, (_, a) => `√(${a})`);
+  // common words -> symbols
+  out = out.replace(/\bpi\b/gi, 'π');
+  out = out.replace(/\btimes\b/gi, '×');
+  out = out.replace(/\bsqrt\b/gi, '√');
+  out = out.replace(/\btheta\b/gi, 'θ');
+  // replace textual degree symbol
+  out = out.replace(/\bdeg\b/gi, '°');
+  return out;
+}
+
 async function sendMessage() {
   if (isLoading) return;
   const input = document.getElementById('userInput');
@@ -1401,14 +1475,17 @@ async function sendMessage() {
         addMsg('ai', `<span class="subject-tag">❌ Error</span><h3>Something went wrong</h3>${escapeHtml(errMsg)}`);
       }
     } else {
-      const answer = data.choices?.[0]?.message?.content || 'No response received.';
-      const formatted = formatResponse(answer);
+      const rawAnswer = data.choices?.[0]?.message?.content || 'No response received.';
+      // remove $ and / characters from answers per user preference
+      const sanitizedAnswer = String(rawAnswer).replace(/\$/g, '').replace(/\//g, '');
+      const symbolized = symbolizeMath(sanitizedAnswer);
+      const formatted = formatResponse(symbolized);
       const qLabel = (q && q.trim())
         ? q.trim()
         : (payload.displayItems && payload.displayItems.length ? '[Attachments / media]' : 'Message');
-      recordQaExchange(qaAnchorToken, qLabel, answer, currentSubject);
+      recordQaExchange(qaAnchorToken, qLabel, sanitizedAnswer, currentSubject);
       addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(currentSubject)}</span>${formatted}`, qaAnchorToken);
-      chatHistory.push({ role: 'assistant', content: answer });
+      chatHistory.push({ role: 'assistant', content: sanitizedAnswer });
       if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
     }
   } catch (err) {
