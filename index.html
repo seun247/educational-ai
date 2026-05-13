@@ -625,7 +625,7 @@ body.history-drawer-open .history-sidebar{
   </div>
   <div class="header-right">
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
-    <button type="button" class="clear-btn" onclick="openVisuals()">🖼 <span>Visuals</span></button>
+    <button type="button" class="clear-btn" onclick="toggleVisuals()">🖼 <span>Visuals</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
   </div>
 </header>
@@ -1670,6 +1670,13 @@ async function reloadVisuals() {
   if (!modal) return;
   closeVisuals();
   setTimeout(() => openVisuals(), 120);
+}
+
+function toggleVisuals() {
+  const modal = document.getElementById('visualsModal');
+  if (!modal) return;
+  const isOpen = window.getComputedStyle(modal).display !== 'none';
+  if (isOpen) closeVisuals(); else openVisuals();
 }
 
 async function ensureVisualsLoaded() {
