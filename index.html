@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
+  <!-- KaTeX for formula rendering in visuals -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -508,7 +510,68 @@ body.history-drawer-open .history-sidebar{
         <button type="button" class="clear-btn" onclick="closeVisuals()">✕ <span>Close</span></button>
       </div>
     </div>
-    <iframe id="visualsFrame" src="" style="width:100%;height:82vh;border:0;display:block"></iframe>
+    <div id="visualsContainer" style="width:100%;height:82vh;overflow:auto;padding:14px;background:var(--surface2);">
+      <!-- Embedded visuals UI (charts, KaTeX, diagrams) -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <h2 style="margin:0">EduAI Visuals</h2>
+        <div style="color:var(--gray);font-size:.92rem">Interactive charts, formula rendering, and simple diagrams — exportable as images.</div>
+        <button type="button" class="clear-btn" style="margin-left:auto" onclick="closeVisuals()">✕ <span>Close</span></button>
+      </div>
+
+      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
+        <label style="font-weight:700">Chart Generator</label>
+        <div style="font-size:.85rem;color:#475569;margin-top:6px">Paste CSV (label,value) lines or use sample data.</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <div style="flex:1;min-width:220px">
+            <textarea id="csvInput" rows="6" placeholder="e.g. Apples,10\nBananas,6\nCherries,14" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <select id="chartType"><option value="bar">Bar</option><option value="line">Line</option><option value="pie">Pie</option></select>
+              <button class="btn" id="genChart">Generate Chart</button>
+              <button class="btn" id="sampleData">Load Sample</button>
+              <button class="btn secondary" id="dlChart">Download Image</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:320px">
+            <canvas id="chartCanvas" width="640" height="360" style="background:#fff;border-radius:8px;border:1px solid #e6eef6"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
+        <label style="font-weight:700">Math Formula Renderer (KaTeX)</label>
+        <div style="font-size:.85rem;color:#475569;margin-top:6px">Type LaTeX math (inline or display). Example: \(\frac{a}{b} = \sqrt{2}\)</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <div style="flex:1;min-width:220px">
+            <input id="latexInput" placeholder="e.g. \frac{1}{2} \pi r^2" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6">
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <button class="btn" id="renderLatex">Render Formula</button>
+              <button class="btn secondary" id="dlFormula">Download Formula</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:220px">
+            <div id="formulaOut" style="min-height:56px;padding:12px;border-radius:8px;border:1px dashed #e6eef6;background:#fff"></div>
+          </div>
+        </div>
+      </section>
+
+      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
+        <label style="font-weight:700">Simple Diagram Canvas</label>
+        <div style="font-size:.85rem;color:#475569;margin-top:6px">A quick labeled sine wave diagram and atom sketch. Customize then export.</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:center">
+          <div style="flex:1;min-width:220px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn" id="drawSine">Draw Sine Wave</button>
+              <button class="btn" id="drawAtom">Draw Atom</button>
+              <button class="btn secondary" id="dlDiagram">Download Diagram</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:220px">
+            <canvas id="diagramCanvas" width="640" height="360" style="background:#fff;border:1px solid #eaeef6;border-radius:8px"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </div>
   </div>
 </div>
 
@@ -520,7 +583,7 @@ body.history-drawer-open .history-sidebar{
   </div>
   <div class="header-right">
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
-    <button type="button" class="clear-btn" onclick="openVisualsNewTab()">🖼 <span>Visuals</span></button>
+    <button type="button" class="clear-btn" onclick="openVisuals()">🖼 <span>Visuals</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
   </div>
 </header>
@@ -1535,12 +1598,22 @@ function clearChat() {
 }
 
 // Visuals modal controls: open iframe lazily, reload, close
-function openVisuals() {
+let __eduai_visuals_loaded = false;
+async function openVisuals() {
   const modal = document.getElementById('visualsModal');
-  const frame = document.getElementById('visualsFrame');
-  if (!modal || !frame) return;
-  if (!frame.src) frame.src = 'eduai_visuals.html';
+  const container = document.getElementById('visualsContainer');
+  if (!modal || !container) return;
   modal.style.display = 'flex';
+  if (!__eduai_visuals_loaded) {
+    try {
+      await ensureVisualsLoaded();
+      setupVisualsHandlers();
+      __eduai_visuals_loaded = true;
+    } catch (e) {
+      console.error('Failed to load visuals libs', e);
+      alert('Could not load visuals tools. Check console for details.');
+    }
+  }
 }
 
 function closeVisuals() {
@@ -1548,12 +1621,92 @@ function closeVisuals() {
   if (modal) modal.style.display = 'none';
 }
 
-function reloadVisuals() {
-  const frame = document.getElementById('visualsFrame');
-  if (frame) {
-    frame.src = '';
-    setTimeout(() => { frame.src = 'eduai_visuals.html'; }, 80);
+async function reloadVisuals() {
+  // simple reload: remove canvases content and re-run setup
+  __eduai_visuals_loaded = false;
+  const modal = document.getElementById('visualsModal');
+  if (!modal) return;
+  closeVisuals();
+  setTimeout(() => openVisuals(), 120);
+}
+
+async function ensureVisualsLoaded() {
+  // load Chart.js, KaTeX and html2canvas dynamically
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js');
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js');
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+}
+
+function setupVisualsHandlers() {
+  // Chart logic
+  let chart = null;
+  function parseCSV(text){
+    const lines = String(text||'').trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const labels = [], values = [];
+    for(const ln of lines){
+      const parts = ln.split(',');
+      if(parts.length<2) continue;
+      labels.push(parts[0].trim());
+      const v = parseFloat(parts.slice(1).join(',').trim());
+      values.push(Number.isFinite(v)?v:0);
+    }
+    return {labels,values};
   }
+
+  document.getElementById('sampleData').addEventListener('click', ()=>{
+    document.getElementById('csvInput').value = 'Apples,12\nBananas,8\nCherries,15\nDates,6';
+  });
+  document.getElementById('genChart').addEventListener('click', ()=>{
+    const raw = document.getElementById('csvInput').value;
+    const type = document.getElementById('chartType').value;
+    const parsed = parseCSV(raw);
+    if(!parsed.labels.length){ alert('Please paste CSV label,value lines or load sample data.'); return; }
+    const ctx = document.getElementById('chartCanvas').getContext('2d');
+    if(chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: type==='pie'?'pie':type,
+      data: { labels: parsed.labels, datasets: [{ label: 'Value', data: parsed.values, backgroundColor: parsed.labels.map((_,i)=>`hsl(${i*45 % 360} 70% 60%)`), borderColor:'#fff', borderWidth:1 }] },
+      options: { responsive:true, maintainAspectRatio:false }
+    });
+  });
+  document.getElementById('dlChart').addEventListener('click', async ()=>{
+    const node = document.getElementById('chartCanvas');
+    const blob = await html2canvas(node,{backgroundColor:null}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
+    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='chart.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  // KaTeX render + download
+  document.getElementById('renderLatex').addEventListener('click', ()=>{
+    const tex = document.getElementById('latexInput').value || '';
+    const out = document.getElementById('formulaOut'); out.innerHTML='';
+    try{
+      katex.render(tex, out, {throwOnError:false, displayMode: false});
+    }catch(e){ out.textContent = 'Render error: '+e.message }
+  });
+  document.getElementById('dlFormula').addEventListener('click', async ()=>{
+    const node = document.getElementById('formulaOut');
+    if(!node.innerHTML.trim()){ alert('Render a formula first'); return; }
+    const blob = await html2canvas(node,{backgroundColor:'#fff'}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
+    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='formula.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  // Diagram drawing
+  const dCanvas = document.getElementById('diagramCanvas');
+  const dCtx = dCanvas.getContext('2d');
+  function clearDiagram(){ dCtx.clearRect(0,0,dCanvas.width,dCanvas.height); dCtx.fillStyle='#fff'; dCtx.fillRect(0,0,dCanvas.width,dCanvas.height); }
+  function drawSine(){ clearDiagram(); const w=dCanvas.width, h=dCanvas.height; dCtx.strokeStyle='#0f172a'; dCtx.lineWidth=2; dCtx.beginPath(); for(let x=0;x<w;x++){ const t = x/w*4*Math.PI; const y = h/2 - Math.sin(t)*(h/4); if(x===0) dCtx.moveTo(x,y); else dCtx.lineTo(x,y); } dCtx.stroke(); dCtx.fillStyle='#0f172a'; dCtx.font='16px sans-serif'; dCtx.fillText('y = sin(x)',20,30); dCtx.strokeStyle='rgba(79,70,229,.45)'; dCtx.lineWidth=1; dCtx.beginPath(); dCtx.moveTo(0,h/2); dCtx.lineTo(w,h/2); dCtx.stroke(); }
+  function drawAtom(){ clearDiagram(); const cx=dCanvas.width/2, cy=dCanvas.height/2; dCtx.fillStyle='#fff'; dCtx.fillRect(0,0,dCanvas.width,dCanvas.height); dCtx.strokeStyle='#0f172a'; dCtx.lineWidth=2; for(let i=1;i<=3;i++){ dCtx.beginPath(); dCtx.ellipse(cx,cy,50*i,30*i, i*0.5,0,Math.PI*2); dCtx.stroke(); } dCtx.fillStyle='#ffb020'; dCtx.beginPath(); dCtx.arc(cx,cy,10,0,Math.PI*2); dCtx.fill(); dCtx.fillStyle='#0f172a'; dCtx.font='16px sans-serif'; dCtx.fillText('Nucleus',cx+15,cy+6); }
+  document.getElementById('drawSine').addEventListener('click', drawSine);
+  document.getElementById('drawAtom').addEventListener('click', drawAtom);
+  document.getElementById('dlDiagram').addEventListener('click', async ()=>{
+    const node = document.getElementById('diagramCanvas');
+    const blob = await new Promise(r=>node.toBlob(r,'image/png'));
+    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='diagram.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  // initial samples
+  document.getElementById('sampleData').click();
+  drawSine();
 }
 
 function openVisualsNewTab() {
