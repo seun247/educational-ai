@@ -489,6 +489,16 @@ body.history-drawer-open .history-sidebar{
 #visualsContainer .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
 #visualsContainer canvas{max-width:100%;height:auto;border-radius:8px}
 
+/* Graph canvas responsive sizing */
+#graphCanvas{width:100% !important;height:320px !important;max-height:56vh;display:block}
+@media(max-width:900px){
+  #graphCanvas{height:260px !important}
+}
+@media(max-width:480px){
+  #graphCanvas{height:220px !important}
+  #visualsContainer{height:62vh}
+}
+
 @media(max-width:900px){
   #visualsContainer{height:70vh;padding:10px}
   #visualsContainer .controls{flex-direction:column;align-items:stretch}
@@ -581,6 +591,37 @@ body.history-drawer-open .history-sidebar{
       </section>
 
       <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
+        <label style="font-weight:700">Graph Plotter</label>
+        <div style="font-size:.85rem;color:#475569;margin-top:6px">Plot mathematical functions or scatter (x,y) points. For functions, use JavaScript/Math expressions with <code>x</code> (e.g. Math.sin(x), x*x, Math.log(x)).</div>
+        <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <div style="flex:1;min-width:240px">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <select id="graphMode"><option value="function">Function</option><option value="scatter">Scatter</option></select>
+              <input id="funcInput" placeholder="e.g. Math.sin(x)" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6eef6">
+            </div>
+
+            <div id="functionControls" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+              <input id="xminInput" placeholder="xmin" value="-6.28" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
+              <input id="xmaxInput" placeholder="xmax" value="6.28" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
+              <input id="stepInput" placeholder="steps" value="200" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
+            </div>
+
+            <div id="scatterControls" style="display:none;margin-top:8px">
+              <textarea id="scatterInput" rows="6" placeholder="x,y per line\n0,0\n1,2\n2,3" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6"></textarea>
+            </div>
+
+            <div class="controls" style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <button class="btn" id="plotGraph">Plot Graph</button>
+              <button class="btn secondary" id="dlGraph">Download Graph</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:320px">
+            <canvas id="graphCanvas" width="640" height="360" style="background:#fff;border-radius:8px;border:1px solid #e6eef6"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
         <label style="font-weight:700">Math Formula Renderer (KaTeX)</label>
         <div style="font-size:.85rem;color:#475569;margin-top:6px">Type LaTeX math (inline or display). Example: \(\frac{a}{b} = \sqrt{2}\)</div>
         <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
@@ -663,6 +704,28 @@ body.history-drawer-open .history-sidebar{
   </select>
 </div>
 
+<!-- Pronunciation panel (visible when English Language selected) -->
+<div id="pronunciationPanel" style="display:none;padding:.6rem clamp(.55rem,2vw,1rem);background:var(--surface);border-bottom:1px solid var(--border);">
+  <label style="font-weight:800;font-size:.9rem;display:block;margin-bottom:.35rem">🔊 Pronunciation (English)</label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input id="pronounceWord" placeholder="Type a word (e.g. knowledge)" style="flex:1;min-width:180px;padding:.55rem .8rem;border:1px solid var(--border);border-radius:10px">
+    <button class="btn" id="playPronounce">Play</button>
+    <button class="btn secondary" id="fetchPhonetic">Get Phonetic</button>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+    <label style="font-size:.85rem">Voice:</label>
+    <select id="voiceSelect" style="padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px"></select>
+    <label style="font-size:.85rem">Rate</label>
+    <input id="voiceRate" type="range" min="0.5" max="2" step="0.05" value="0.95" style="width:120px">
+    <label style="font-size:.85rem">Pitch</label>
+    <input id="voicePitch" type="range" min="0.5" max="2" step="0.05" value="1" style="width:120px">
+    <label style="font-size:.85rem;display:flex;align-items:center;gap:6px"><input id="useTTS" type="checkbox"> Use TTS</label>
+    <label style="font-size:.85rem;display:flex;align-items:center;gap:6px"><input id="autoPlayCheck" type="checkbox" checked> Auto-play on fetch</label>
+    <button class="btn secondary" id="saveAudio" disabled>Save audio</button>
+  </div>
+  <div id="phoneticOut" style="margin-top:.6rem;color:var(--dark);font-weight:700"></div>
+</div>
+
 <div id="chat-wrap">
   <div id="chat"></div>
 </div>
@@ -682,6 +745,21 @@ body.history-drawer-open .history-sidebar{
 <script>
 // Previously the file included a bundled key; restore a safe placeholder. Replace with your real key if needed.
 const BUNDLED_OPENROUTER_KEY = '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';
+// Ensure the key is available in localStorage so the setup modal does not appear.
+try{
+  if(!localStorage.getItem('eduai_or_key')){
+    localStorage.setItem('eduai_or_key', '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');
+  }
+}catch(e){}
+// In case the modal is still visible due to timing or caching, hide it on DOM ready
+try{
+  document.addEventListener('DOMContentLoaded', ()=>{
+    try{
+      const m = document.getElementById('apiModal'); if(m) m.style.display = 'none';
+    }catch(e){}
+    try{ const ui = document.getElementById('userInput'); if(ui) ui.disabled = false; const sb = document.getElementById('sendBtn'); if(sb) sb.disabled = false; }catch(e){}
+  });
+}catch(e){}
 
 function resolveInitialApiKey() {
   const bundled = String(BUNDLED_OPENROUTER_KEY || '').trim();
@@ -1378,6 +1456,7 @@ function init() {
   }
   qaHistory = loadQaHistoryFromStorage();
   renderHistorySidebar();
+  try{ setupPronunciationUI(); }catch(e){/* ignore if not yet defined */}
   showWelcome();
 }
 
@@ -1436,6 +1515,9 @@ function setSubject(subj) {
   const suggs = SUGGESTIONS[subj] || SUGGESTIONS['General'];
   const suggHtml = suggs.map(s => `<button type="button" class="sug-btn" onclick="askSuggestion('${escapeForOnclickQuote(s)}')">💡 ${s}</button>`).join('');
   addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(subj)}</span><h3>Switched to ${escapeHtml(subj)}</h3>I'm now focused on <strong>${escapeHtml(subj)}</strong>. Ask me anything about this subject — from basics to advanced topics.<div class="suggestions">${suggHtml}</div>`);
+  // show pronunciation controls when English Language is selected
+  const pronPanel = document.getElementById('pronunciationPanel');
+  if (pronPanel) pronPanel.style.display = (subj === 'English Language') ? 'block' : 'none';
 }
 
 function autoResize(el) {
@@ -1690,6 +1772,7 @@ async function ensureVisualsLoaded() {
 function setupVisualsHandlers() {
   // Chart logic
   let chart = null;
+  let graphChart = null;
   function parseCSV(text){
     const lines = String(text||'').trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
     const labels = [], values = [];
@@ -1725,6 +1808,73 @@ function setupVisualsHandlers() {
     if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='chart.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   });
 
+  // Graph Plotter handlers
+  function parseScatter(text){
+    const lines = String(text||'').trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const xs = [], ys = [];
+    for(const ln of lines){
+      const parts = ln.split(',');
+      if(parts.length<2) continue;
+      const x = parseFloat(parts[0].trim()), y = parseFloat(parts[1].trim());
+      if(Number.isFinite(x) && Number.isFinite(y)){ xs.push(x); ys.push(y); }
+    }
+    return {xs, ys};
+  }
+
+  function generateFunctionData(expr, xmin, xmax, steps){
+    const xs = [];
+    const ys = [];
+    const step = (xmax - xmin) / Math.max(1, steps-1);
+    for(let i=0;i<steps;i++){
+      const x = xmin + step * i;
+      let y = NaN;
+      try{ y = Function('x', 'with(Math){ return ' + expr + ' }')(x); }catch(e){ y = NaN }
+      if(!Number.isFinite(y)) y = NaN;
+      xs.push(x); ys.push(y);
+    }
+    return {xs, ys};
+  }
+
+  document.getElementById('graphMode').addEventListener('change', (e)=>{
+    const mode = e.target.value;
+    document.getElementById('functionControls').style.display = mode==='function' ? 'flex' : 'none';
+    document.getElementById('scatterControls').style.display = mode==='scatter' ? 'block' : 'none';
+  });
+
+  document.getElementById('plotGraph').addEventListener('click', ()=>{
+    const mode = document.getElementById('graphMode').value;
+    const ctx = document.getElementById('graphCanvas').getContext('2d');
+    if(graphChart) graphChart.destroy();
+    if(mode==='function'){
+      const expr = document.getElementById('funcInput').value.trim() || 'Math.sin(x)';
+      const xmin = parseFloat(document.getElementById('xminInput').value) || -6.28;
+      const xmax = parseFloat(document.getElementById('xmaxInput').value) || 6.28;
+      const steps = Math.max(10, parseInt(document.getElementById('stepInput').value) || 200);
+      const data = generateFunctionData(expr, xmin, xmax, steps);
+      const labels = data.xs.map(v=>Number.isFinite(v)?v.toFixed(3):'');
+      graphChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: [{ label: expr, data: data.ys, borderColor: 'hsl(220 70% 50%)', backgroundColor:'rgba(79,70,229,0.08)', pointRadius:0 }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{ title:{display:true,text:'x'} }, y:{ title:{display:true,text:'y'} } } }
+      });
+    } else {
+      const txt = document.getElementById('scatterInput').value;
+      const p = parseScatter(txt);
+      if(!p.xs.length){ alert('No valid scatter points found. Provide x,y per line.'); return; }
+      graphChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Scatter', data: p.xs.map((x,i)=>({x: x, y: p.ys[i]})), backgroundColor:'hsl(10 80% 50%)' }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{ type:'linear', position:'bottom', title:{display:true,text:'x'} }, y:{ title:{display:true,text:'y'} } } }
+      });
+    }
+  });
+
+  document.getElementById('dlGraph').addEventListener('click', async ()=>{
+    const node = document.getElementById('graphCanvas');
+    const blob = await html2canvas(node,{backgroundColor:null}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
+    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='graph.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
   // KaTeX render + download
   document.getElementById('renderLatex').addEventListener('click', ()=>{
     const tex = document.getElementById('latexInput').value || '';
@@ -1757,6 +1907,152 @@ function setupVisualsHandlers() {
   // initial samples
   document.getElementById('sampleData').click();
   drawSine();
+  // pronunciation setup
+  try{ setupPronunciationUI(); }catch(e){console.warn('pronunciation UI init failed',e)}
+}
+
+// Pronunciation helpers: fetch IPA and audio from dictionaryapi.dev, fallback to SpeechSynthesis
+let __lastPhoneticAudio = null;
+function setupPronunciationUI(){
+  const playBtn = document.getElementById('playPronounce');
+  const fetchBtn = document.getElementById('fetchPhonetic');
+  const wordInput = document.getElementById('pronounceWord');
+  const out = document.getElementById('phoneticOut');
+  const voiceSelect = document.getElementById('voiceSelect');
+  const rateInput = document.getElementById('voiceRate');
+  const pitchInput = document.getElementById('voicePitch');
+  const useTTSCheck = document.getElementById('useTTS');
+  const autoPlayCheck = document.getElementById('autoPlayCheck');
+  const saveAudioBtn = document.getElementById('saveAudio');
+  if(!playBtn || !fetchBtn || !wordInput || !out) return;
+  if(saveAudioBtn) saveAudioBtn.disabled = true;
+
+  // populate speech synthesis voices when available
+  function loadVoices(){
+    if(!voiceSelect) return;
+    voiceSelect.innerHTML = '';
+    const synth = window.speechSynthesis;
+    if(!synth) {
+      const opt = document.createElement('option'); opt.textContent='(no TTS)'; opt.value=''; voiceSelect.appendChild(opt);
+      return;
+    }
+    const voices = synth.getVoices() || [];
+    if(!voices.length){ // some browsers load asynchronously
+      synth.onvoiceschanged = () => loadVoices();
+      return;
+    }
+    voices.forEach(v => {
+      const o = document.createElement('option'); o.value = v.name + '|' + (v.lang||''); o.textContent = v.name + ' — ' + (v.lang||'');
+      voiceSelect.appendChild(o);
+    });
+  }
+  loadVoices();
+  playBtn.addEventListener('click', async ()=>{
+    const w = (wordInput.value||'').trim(); if(!w) return alert('Type a word to pronounce');
+    // if we have an audio url from fetch and user didn't force TTS, try that first
+    if(__lastPhoneticAudio && !useTTSCheck?.checked){
+      try{ const a = new Audio(__lastPhoneticAudio); await a.play(); return; }catch(e){ /* fallthrough to TTS */ }
+    }
+    // use SpeechSynthesis if available
+    if('speechSynthesis' in window){
+      const ut = new SpeechSynthesisUtterance(w);
+      ut.lang = 'en-US';
+      ut.rate = parseFloat(rateInput?.value) || 0.95;
+      ut.pitch = parseFloat(pitchInput?.value) || 1;
+      // choose selected voice if available
+      try{
+        const synth = window.speechSynthesis; const voices = synth.getVoices() || [];
+        if(voiceSelect && voiceSelect.value){
+          const name = voiceSelect.value.split('|')[0];
+          const vv = voices.find(x=>x.name===name);
+          if(vv) ut.voice = vv;
+        }
+      }catch(e){}
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(ut);
+      return;
+    }
+    alert('Speech synthesis not available in this browser');
+  });
+
+  fetchBtn.addEventListener('click', async ()=>{
+    const w = (wordInput.value||'').trim(); if(!w) return alert('Type a word to fetch phonetic for');
+    out.textContent = 'Looking up...'; __lastPhoneticAudio = null; if(saveAudioBtn) saveAudioBtn.disabled = true;
+    try{
+      const res = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w));
+      if(!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      // data is an array of entries; collect phonetics (text + audio)
+      const phonetics = [];
+      for(const entry of data){
+        if(entry.phonetics && entry.phonetics.length){
+          for(const p of entry.phonetics){
+            if(p.text || p.audio) phonetics.push({text:p.text||'', audio:p.audio||''});
+          }
+        }
+        if(entry.meanings && !entry.phonetics) {
+          // continue
+        }
+      }
+      if(!phonetics.length){ out.textContent = 'Phonetic not available for this entry'; }
+      else{
+        out.innerHTML = '';
+        phonetics.forEach((ph, idx)=>{
+          const wrap = document.createElement('div');
+          wrap.style.marginBottom = '6px';
+          const t = document.createElement('span'); t.style.fontWeight='800'; t.style.marginRight='8px';
+          t.textContent = ph.text ? ph.text : '(no IPA)';
+          const ainfo = document.createElement('span'); ainfo.style.opacity='.8'; ainfo.style.fontSize='.9rem';
+          ainfo.textContent = ph.audio ? 'audio available' : '';
+          wrap.appendChild(t); wrap.appendChild(ainfo);
+          out.appendChild(wrap);
+          if(ph.audio && !__lastPhoneticAudio) __lastPhoneticAudio = ph.audio;
+        });
+      }
+      if (__lastPhoneticAudio) {
+        if (saveAudioBtn) saveAudioBtn.disabled = false;
+        if (autoPlayCheck && autoPlayCheck.checked) {
+          // auto-play using fetched audio unless user prefers TTS
+          const forceTTS = useTTSCheck && useTTSCheck.checked;
+          if (!forceTTS) {
+            try {
+              const a = new Audio(__lastPhoneticAudio);
+              a.play();
+            } catch (ee) {}
+          } else if ('speechSynthesis' in window) {
+            try {
+              const ut = new SpeechSynthesisUtterance(w);
+              ut.lang = 'en-US';
+              ut.rate = parseFloat((rateInput && rateInput.value) || 0.95) || 0.95;
+              ut.pitch = parseFloat((pitchInput && pitchInput.value) || 1) || 1;
+              try {
+                const synth = window.speechSynthesis;
+                const vv = synth.getVoices() || [];
+                if (voiceSelect && voiceSelect.value) {
+                  const name = voiceSelect.value.split('|')[0];
+                  const found = vv.find(x => x.name === name);
+                  if (found) ut.voice = found;
+                }
+              } catch (ee) {}
+              window.speechSynthesis.cancel();
+              window.speechSynthesis.speak(ut);
+            } catch (ee) {}
+          }
+        }
+      }
+    }catch(err){
+      out.textContent = 'Lookup failed — using browser TTS when Play is pressed';
+    }
+  });
+
+  if(saveAudioBtn) saveAudioBtn.addEventListener('click', async ()=>{
+    if(!__lastPhoneticAudio) return alert('No audio available to save');
+    try{
+      const r = await fetch(__lastPhoneticAudio);
+      const blob = await r.blob();
+      const name = (wordInput.value||'pronunciation') + '.mp3';
+      const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }catch(e){ alert('Failed to save audio'); }
+  });
 }
 
 function openVisualsNewTab() {
