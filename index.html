@@ -30,15 +30,15 @@ body{
   color:var(--dark);
   min-height:100dvh;
   height:auto;
-  max-height:none;
-  display:flex;
-  flex-direction:column;
-  overflow-y:auto;
-  overflow-x:hidden;
-  background:
-    radial-gradient(1200px 600px at 10% -10%,rgba(99,102,241,.35),transparent),
     radial-gradient(900px 500px at 100% 0%,rgba(219,39,119,.22),transparent),
     linear-gradient(165deg,var(--bg0) 0%,#1e293b 40%,#312e81 100%);
+      // speak the assistant answer if enabled
+      try {
+        if (speakReplies) {
+          // prefer plain sanitizedAnswer text for speech
+          speakText(sanitizedAnswer);
+        }
+      } catch (e) {}
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -668,6 +668,8 @@ body.history-drawer-open .history-sidebar{
   <div class="header-right">
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
     <button type="button" class="clear-btn" onclick="toggleVisuals()">🖼 <span>Visuals</span></button>
+    <button type="button" class="clear-btn" id="micBtn" title="Start voice input">🎙 <span>Speak</span></button>
+    <button type="button" class="clear-btn" id="speakToggleBtn" title="Toggle voice replies">🔊 <span id="speakToggleLabel">Speak</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
   </div>
 </header>
@@ -771,6 +773,9 @@ let apiKey = resolveInitialApiKey();
 let currentSubject = 'General';
 let isLoading = false;
 let chatHistory = [];
+let recognition = null;
+let recognizing = false;
+let speakReplies = (localStorage.getItem('eduai_speak_replies') === '1');
 
 const QA_STORE_KEY = 'eduai_qa_history_v1';
 let qaHistory = [];
@@ -1457,6 +1462,7 @@ function init() {
   qaHistory = loadQaHistoryFromStorage();
   renderHistorySidebar();
   try{ setupPronunciationUI(); }catch(e){/* ignore if not yet defined */}
+  try{ initSpeechRecognition(); }catch(e){}
   showWelcome();
 }
 
@@ -2053,6 +2059,96 @@ function setupPronunciationUI(){
       const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }catch(e){ alert('Failed to save audio'); }
   });
+}
+
+// Speech recognition integration
+function initSpeechRecognition(){
+  const micBtn = document.getElementById('micBtn');
+  const speakBtn = document.getElementById('speakToggleBtn');
+  const speakLabel = document.getElementById('speakToggleLabel');
+  if(!micBtn || !speakBtn) return;
+  // update speak button label
+  function updateSpeakLabel(){ speakLabel.textContent = speakReplies ? 'Speaking ON' : 'Speak'; }
+  updateSpeakLabel();
+  speakBtn.addEventListener('click', ()=>{
+    speakReplies = !speakReplies;
+    localStorage.setItem('eduai_speak_replies', speakReplies ? '1' : '0');
+    updateSpeakLabel();
+  });
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    micBtn.title = 'Voice input not supported';
+    micBtn.addEventListener('click', ()=>{ alert('Speech recognition not supported in this browser. Try Chrome or Edge.'); });
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  let finalTranscript = '';
+  recognition.onstart = () => { recognizing = true; micBtn.classList.add('active'); micBtn.textContent = '🔴'; micBtn.title='Listening... Click to stop'; };
+  recognition.onend = () => { recognizing = false; micBtn.classList.remove('active'); micBtn.innerHTML = '🎙 <span>Speak</span>'; micBtn.title='Start voice input'; };
+  recognition.onerror = (e) => { console.warn('Recognition error', e); recognizing=false; micBtn.innerHTML = '🎙 <span>Speak</span>'; };
+  recognition.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      const res = event.results[i];
+      if (res.isFinal) finalTranscript += res[0].transcript;
+      else interim += res[0].transcript;
+    }
+    // show interim in input
+    const ui = document.getElementById('userInput');
+    if (ui) ui.value = (finalTranscript + ' ' + interim).trim();
+  };
+
+  micBtn.addEventListener('click', ()=>{
+    if(recognizing){ recognition.stop(); return; }
+    finalTranscript = '';
+    try{ recognition.start(); }catch(e){ console.warn('start failed', e); }
+    // stop automatically after 20s
+    setTimeout(()=>{ if(recognizing) recognition.stop(); }, 20000);
+  });
+
+  recognition.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      const res = event.results[i];
+      if (res.isFinal) finalTranscript += res[0].transcript;
+      else interim += res[0].transcript;
+    }
+    const ui = document.getElementById('userInput');
+    if (ui) ui.value = (finalTranscript + ' ' + interim).trim();
+    // if final, submit automatically
+    if (event.results[event.results.length-1].isFinal){
+      const text = (finalTranscript).trim();
+      if(text){
+        finalTranscript = '';
+        // send as message
+        document.getElementById('userInput').value = text;
+        sendMessage();
+      }
+    }
+  };
+}
+
+// Speak plain text using selected voice controls
+function speakText(text){
+  if(!text) return;
+  if(!('speechSynthesis' in window)) return;
+  const voiceSelect = document.getElementById('voiceSelect');
+  const rateInput = document.getElementById('voiceRate');
+  const pitchInput = document.getElementById('voicePitch');
+  const ut = new SpeechSynthesisUtterance(text);
+  ut.lang = 'en-US';
+  ut.rate = parseFloat((rateInput && rateInput.value) || 0.95) || 0.95;
+  ut.pitch = parseFloat((pitchInput && pitchInput.value) || 1) || 1;
+  try{
+    const synth = window.speechSynthesis; const vv = synth.getVoices() || [];
+    if(voiceSelect && voiceSelect.value){ const name = voiceSelect.value.split('|')[0]; const found = vv.find(x=>x.name===name); if(found) ut.voice = found; }
+  }catch(e){}
+  window.speechSynthesis.cancel(); window.speechSynthesis.speak(ut);
 }
 
 function openVisualsNewTab() {
