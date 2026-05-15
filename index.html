@@ -19,10 +19,6 @@
   --shadow-lg:0 25px 50px -12px rgba(15,23,42,.18);--radius:16px;--radius-sm:12px;
   --font:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
 }
-/* Voice/mic button styles */
-.clear-btn#micBtn.active{background:linear-gradient(145deg,#ff4d4d,#ff6b6b);color:#fff;border-color:rgba(255,0,0,.2)}
-.clear-btn#speakToggleBtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}
-.clear-btn#speakToggleBtn.active{background:linear-gradient(135deg,#10b981,#06b6d4);color:#fff}
 html{
   height:100%;
   overflow:auto;
@@ -34,15 +30,15 @@ body{
   color:var(--dark);
   min-height:100dvh;
   height:auto;
+  max-height:none;
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+  overflow-x:hidden;
+  background:
+    radial-gradient(1200px 600px at 10% -10%,rgba(99,102,241,.35),transparent),
     radial-gradient(900px 500px at 100% 0%,rgba(219,39,119,.22),transparent),
     linear-gradient(165deg,var(--bg0) 0%,#1e293b 40%,#312e81 100%);
-      // speak the assistant answer if enabled
-      try {
-        if (speakReplies) {
-          // prefer plain sanitizedAnswer text for speech
-          speakText(sanitizedAnswer);
-        }
-      } catch (e) {}
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -672,8 +668,6 @@ body.history-drawer-open .history-sidebar{
   <div class="header-right">
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
     <button type="button" class="clear-btn" onclick="toggleVisuals()">🖼 <span>Visuals</span></button>
-    <button type="button" class="clear-btn" id="micBtn" title="Start voice input">🎙 <span>Speak</span></button>
-    <button type="button" class="clear-btn" id="speakToggleBtn" title="Toggle voice replies">🔊 <span id="speakToggleLabel">Speak</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
   </div>
 </header>
@@ -777,9 +771,6 @@ let apiKey = resolveInitialApiKey();
 let currentSubject = 'General';
 let isLoading = false;
 let chatHistory = [];
-let recognition = null;
-let recognizing = false;
-let speakReplies = (localStorage.getItem('eduai_speak_replies') === '1');
 
 const QA_STORE_KEY = 'eduai_qa_history_v1';
 let qaHistory = [];
@@ -1466,7 +1457,6 @@ function init() {
   qaHistory = loadQaHistoryFromStorage();
   renderHistorySidebar();
   try{ setupPronunciationUI(); }catch(e){/* ignore if not yet defined */}
-  try{ initSpeechRecognition(); }catch(e){}
   showWelcome();
 }
 
@@ -1923,20 +1913,6 @@ function setupVisualsHandlers() {
 
 // Pronunciation helpers: fetch IPA and audio from dictionaryapi.dev, fallback to SpeechSynthesis
 let __lastPhoneticAudio = null;
-// Ensure speechSynthesis voices are loaded
-function ensureVoicesLoaded(timeout = 2000){
-  return new Promise((resolve)=>{
-    try{
-      const synth = window.speechSynthesis;
-      if(!synth) return resolve([]);
-      let voices = synth.getVoices();
-      if(voices && voices.length) return resolve(voices);
-      const onChange = () => { voices = synth.getVoices(); synth.removeEventListener('voiceschanged', onChange); resolve(voices); };
-      synth.addEventListener('voiceschanged', onChange);
-      setTimeout(()=>{ try{ synth.removeEventListener('voiceschanged', onChange); }catch(e){}; resolve(synth.getVoices()||[]); }, timeout);
-    }catch(e){ resolve([]); }
-  });
-}
 function setupPronunciationUI(){
   const playBtn = document.getElementById('playPronounce');
   const fetchBtn = document.getElementById('fetchPhonetic');
@@ -1960,15 +1936,14 @@ function setupPronunciationUI(){
       const opt = document.createElement('option'); opt.textContent='(no TTS)'; opt.value=''; voiceSelect.appendChild(opt);
       return;
     }
-    // wait for voices to be available
-    ensureVoicesLoaded().then(voices => {
-      if(!voices || !voices.length){ const opt = document.createElement('option'); opt.textContent='(no voices)'; opt.value=''; voiceSelect.appendChild(opt); return; }
-      voices.forEach(v => {
-        const o = document.createElement('option'); o.value = v.name + '|' + (v.lang||''); o.textContent = v.name + ' — ' + (v.lang||'');
-        voiceSelect.appendChild(o);
-      });
-    }).catch(()=>{
-      const opt = document.createElement('option'); opt.textContent='(no voices)'; opt.value=''; voiceSelect.appendChild(opt);
+    const voices = synth.getVoices() || [];
+    if(!voices.length){ // some browsers load asynchronously
+      synth.onvoiceschanged = () => loadVoices();
+      return;
+    }
+    voices.forEach(v => {
+      const o = document.createElement('option'); o.value = v.name + '|' + (v.lang||''); o.textContent = v.name + ' — ' + (v.lang||'');
+      voiceSelect.appendChild(o);
     });
   }
   loadVoices();
@@ -2078,106 +2053,6 @@ function setupPronunciationUI(){
       const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }catch(e){ alert('Failed to save audio'); }
   });
-}
-
-// Speech recognition integration
-function initSpeechRecognition(){
-  const micBtn = document.getElementById('micBtn');
-  const speakBtn = document.getElementById('speakToggleBtn');
-  const speakLabel = document.getElementById('speakToggleLabel');
-  if(!micBtn || !speakBtn) return;
-  // update speak button label
-  function updateSpeakLabel(){ speakLabel.textContent = speakReplies ? 'Speaking ON' : 'Speak'; }
-  updateSpeakLabel();
-  speakBtn.addEventListener('click', ()=>{
-    speakReplies = !speakReplies;
-    localStorage.setItem('eduai_speak_replies', speakReplies ? '1' : '0');
-    updateSpeakLabel();
-  });
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRecognition){
-    micBtn.title = 'Voice input not supported';
-    micBtn.addEventListener('click', ()=>{ alert('Speech recognition not supported in this browser. Try Chrome or Edge.'); });
-    return;
-  }
-  recognition = new SpeechRecognition();
-  recognition.lang = 'en-US';
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-
-  let finalTranscript = '';
-  recognition.onstart = () => { recognizing = true; micBtn.classList.add('active'); micBtn.textContent = '🔴'; micBtn.title='Listening... Click to stop'; };
-  recognition.onend = () => { recognizing = false; micBtn.classList.remove('active'); micBtn.innerHTML = '🎙 <span>Speak</span>'; micBtn.title='Start voice input'; };
-  recognition.onerror = (e) => { console.warn('Recognition error', e); recognizing=false; micBtn.innerHTML = '🎙 <span>Speak</span>'; };
-  recognition.onresult = (event) => {
-    let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const res = event.results[i];
-      if (res.isFinal) finalTranscript += res[0].transcript;
-      else interim += res[0].transcript;
-    }
-    // show interim in input
-    const ui = document.getElementById('userInput');
-    if (ui) ui.value = (finalTranscript + ' ' + interim).trim();
-  };
-
-  micBtn.addEventListener('click', ()=>{
-    if(recognizing){ recognition.stop(); return; }
-    finalTranscript = '';
-    try{ recognition.start(); }catch(e){ console.warn('start failed', e); }
-    // stop automatically after 20s
-    setTimeout(()=>{ if(recognizing) recognition.stop(); }, 20000);
-  });
-
-  // reflect speakReplies state on toggle button style
-  const updateSpeakBtn = ()=>{
-    if(speakReplies) speakBtn.classList.add('active'); else speakBtn.classList.remove('active');
-    updateSpeakLabel();
-  };
-  updateSpeakBtn();
-
-  recognition.onresult = (event) => {
-    let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const res = event.results[i];
-      if (res.isFinal) finalTranscript += res[0].transcript;
-      else interim += res[0].transcript;
-    }
-    const ui = document.getElementById('userInput');
-    if (ui) ui.value = (finalTranscript + ' ' + interim).trim();
-    // if final, submit automatically
-    if (event.results[event.results.length-1].isFinal){
-      const text = (finalTranscript).trim();
-      if(text){
-        finalTranscript = '';
-        // send as message
-        document.getElementById('userInput').value = text;
-        sendMessage();
-      }
-    }
-  };
-}
-
-// Speak plain text using selected voice controls
-async function speakText(text){
-  if(!text) return;
-  if(!('speechSynthesis' in window)) return;
-  const voiceSelect = document.getElementById('voiceSelect');
-  const rateInput = document.getElementById('voiceRate');
-  const pitchInput = document.getElementById('voicePitch');
-  await ensureVoicesLoaded();
-  try{
-    const ut = new SpeechSynthesisUtterance(text);
-    ut.lang = 'en-US';
-    ut.rate = parseFloat((rateInput && rateInput.value) || 0.95) || 0.95;
-    ut.pitch = parseFloat((pitchInput && pitchInput.value) || 1) || 1;
-    try{
-      const synth = window.speechSynthesis; const vv = synth.getVoices() || [];
-      if(voiceSelect && voiceSelect.value){ const name = voiceSelect.value.split('|')[0]; const found = vv.find(x=>x.name===name); if(found) ut.voice = found; }
-    }catch(e){}
-    window.speechSynthesis.cancel(); window.speechSynthesis.speak(ut);
-  }catch(e){ console.warn('speak failed', e); }
 }
 
 function openVisualsNewTab() {
