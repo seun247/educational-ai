@@ -75,6 +75,7 @@ header{
 }
 .clear-btn:hover{background:rgba(255,255,255,.22)}
 .clear-btn:active{transform:scale(.97)}
+.mobile-menu-btn{display:none}
 
 /* SUBJECT BAR */
 .subjects-bar{
@@ -455,8 +456,10 @@ body.history-drawer-open .history-sidebar{
 }
 
 @media(max-width:480px){
-  .clear-btn span{display:none}
-  .history-toggle-btn span{display:none}
+  /* show compact mobile menu button and keep its label visible */
+  .header-right > button:not(.mobile-menu-btn){display:none}
+  .mobile-menu-btn{display:inline-flex}
+  .mobile-menu-btn span{display:inline}
   header{gap:.5rem;padding:.5rem .65rem}
   .header-text h1{font-size:clamp(1.25rem,8vw,1.6rem)}
   .subjects-bar{padding:.5rem .65rem}
@@ -669,6 +672,13 @@ body.history-drawer-open .history-sidebar{
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
     <button type="button" class="clear-btn" onclick="toggleVisuals()">🖼 <span>Visuals</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
+    <!-- Mobile menu button and dropdown -->
+    <button type="button" class="clear-btn mobile-menu-btn" id="mobileMenuBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleMobileMenu()">☰ <span>Menu</span></button>
+    <div id="mobileMenu" class="mobile-menu" style="display:none;position:absolute;right:12px;top:56px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px;z-index:1200;">
+      <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="toggleHistoryDrawer();toggleMobileMenu()">📜 History</button>
+      <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="toggleVisuals();toggleMobileMenu()">🖼 Visuals</button>
+      <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="clearChat();toggleMobileMenu()">🗑 Clear chat</button>
+    </div>
   </div>
 </header>
 
@@ -2061,6 +2071,25 @@ function openVisualsNewTab() {
 
 window.addEventListener('resize', () => {
   if (window.innerWidth >= 901) closeHistoryDrawer();
+});
+
+// Mobile menu toggle & outside-click close
+function toggleMobileMenu(){
+  const m = document.getElementById('mobileMenu');
+  const btn = document.getElementById('mobileMenuBtn');
+  if(!m || !btn) return;
+  const isOpen = window.getComputedStyle(m).display !== 'none';
+  if(isOpen){ m.style.display = 'none'; btn.setAttribute('aria-expanded','false'); }
+  else { m.style.display = 'block'; btn.setAttribute('aria-expanded','true'); }
+}
+document.addEventListener('click', (ev)=>{
+  const m = document.getElementById('mobileMenu');
+  const btn = document.getElementById('mobileMenuBtn');
+  if(!m || !btn) return;
+  if(m.style.display === 'none') return;
+  const target = ev.target;
+  if(target === btn || btn.contains(target) || m.contains(target)) return;
+  m.style.display = 'none'; btn.setAttribute('aria-expanded','false');
 });
 
 init();
