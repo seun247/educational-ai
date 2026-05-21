@@ -1473,7 +1473,7 @@ function init() {
 function showWelcome() {
   const suggs = SUGGESTIONS['General'];
   const suggHtml = suggs.map(s => `<button type="button" class="sug-btn" onclick="askSuggestion('${escapeForOnclickQuote(s)}')">💡 ${s}</button>`).join('');
-  addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>Hello! I'm EduAI 👋</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more<br><br>Try a question below:<div class="suggestions">${suggHtml}</div>`);
+  addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>Hello! I'm EduAI 👋</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more`);
 }
 
 function saveApiKey() {
@@ -1522,9 +1522,7 @@ function setSubject(subj) {
   currentSubject = subj;
   const sel = document.getElementById('subjectSelect');
   if (sel) sel.value = subj;
-  const suggs = SUGGESTIONS[subj] || SUGGESTIONS['General'];
-  const suggHtml = suggs.map(s => `<button type="button" class="sug-btn" onclick="askSuggestion('${escapeForOnclickQuote(s)}')">💡 ${s}</button>`).join('');
-  addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(subj)}</span><h3>Switched to ${escapeHtml(subj)}</h3>I'm now focused on <strong>${escapeHtml(subj)}</strong>. Ask me anything about this subject — from basics to advanced topics.<div class="suggestions">${suggHtml}</div>`);
+  addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(subj)}</span><h3>Switched to ${escapeHtml(subj)}</h3>I'm now focused on <strong>${escapeHtml(subj)}</strong>. Ask me anything about this subject — from basics to advanced topics.`);
   // show pronunciation controls when English Language is selected
   const pronPanel = document.getElementById('pronunciationPanel');
   if (pronPanel) pronPanel.style.display = (subj === 'English Language') ? 'block' : 'none';
