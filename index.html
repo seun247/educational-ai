@@ -10,8 +10,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
   <link rel="icon" href="icons.png" type="image/png">
-  <!-- KaTeX for formula rendering in visuals -->
+  <!-- KaTeX: renders LaTeX math in chat answers (not just the visuals tool) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/contrib/auto-render.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -915,7 +917,10 @@ function scrollToQaAnchor(token) {
       }
       if (existingAiEl) {
         const aiBubble = existingAiEl.querySelector('.bubble.ai');
-        if (aiBubble) aiBubble.innerHTML = formatResponse(entry.aFull || entry.a || '');
+        if (aiBubble) {
+          aiBubble.innerHTML = formatResponse(entry.aFull || entry.a || '');
+          renderMathIn(aiBubble);
+        }
       }
     }
     const el = existingAiEl || existingUserEl;
@@ -951,6 +956,7 @@ function scrollToQaAnchor(token) {
   const aBub = document.createElement('div');
   aBub.className = 'bubble ai';
   aBub.innerHTML = formatResponse(entry.aFull || entry.a || '');
+  renderMathIn(aBub);
   aiDiv.appendChild(aAv);
   aiDiv.appendChild(aBub);
 
@@ -979,15 +985,23 @@ Your role:
 - Answer educational questions clearly, accurately, and in a student-friendly way
 - Provide step-by-step explanations for problems (especially maths and science)
 - Use examples, analogies, and real-world applications to explain concepts
-- Format responses with clear headings, bullet points, and numbered steps where helpful
+- Format responses the way a well-formatted ChatGPT answer reads: short paragraphs, clear headings, bold key terms, and numbered steps where helpful — never one dense unbroken paragraph
 - For maths: show full working/steps
 - For science: include formulas, diagrams described in text, and examples
 - Adapt your language to the student's apparent level
 - Always be encouraging and supportive
 - Cover ALL academic subjects: Mathematics, Physics, Chemistry, Biology, English, History, Geography, Computer Science, Economics, Civic Education, Literature, Agriculture, Further Maths, Technical Drawing, and more
 - When asked about a specific subject, focus your answer on that subject context
- - Generate detailed and comprehensive lesson notes on any topic when requested, including learning objectives, key points, examples, and suggested activities or assessments
- - Generate exam questions for teachers on any topic when requested, including a range of difficulty levels, suggested marking scheme, and model answers or marking points
+- Generate detailed and comprehensive lesson notes on any topic when requested, including learning objectives, key points, examples, and suggested activities or assessments
+- Generate exam questions for teachers on any topic when requested, including a range of difficulty levels, suggested marking scheme, and model answers or marking points
+
+MATH AND FORMULA NOTATION — follow this exactly, it controls how your answer is rendered:
+- Write every mathematical expression, equation, or formula in LaTeX, wrapped ONLY in \\( ... \\) for inline math or \\[ ... \\] for a standalone/display equation. Never use $ or $$ — those are not supported here.
+- Never leave a formula as unwrapped plain text (e.g. "x^2 + 3x"). Always wrap it: \\( x^2 + 3x \\).
+- Never write dollar signs for currency either — spell amounts out (e.g. "21 trillion naira" or "USD 21 trillion") instead of using the $ symbol, since $ is reserved for math delimiters here.
+- For Mathematics and Further Mathematics specifically: solve step-by-step, one step per line, writing each step as its own \\[ ... \\] display equation so it lines up clearly like a worked solution — then state the final answer on its own line, e.g. "**Answer:** \\( x = 3 \\)".
+- For Physics, Chemistry, and Economics: wrap every formula, equation, and chemical or mathematical expression the same way (e.g. \\( H_2O \\), \\( F = ma \\)).
+- For subjects without formulas (English, History, Literature, Civic Education, etc.), do not force LaTeX — write normal prose.
 
 Current subject focus: `;
 
@@ -1580,6 +1594,22 @@ function removeTyping() {
 }
 
 function formatResponse(text) {
+  text = String(text);
+
+  // Protect LaTeX math regions (\( ... \) inline, \[ ... \] display) from
+  // every transform below, so multi-line formulas survive intact and KaTeX
+  // gets the real, untouched source to render afterward.
+  const mathBlocks = [];
+  text = text.replace(/\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, (m) => {
+    mathBlocks.push(m);
+    return `@@MATH${mathBlocks.length - 1}@@`;
+  });
+
+  // Escape everything else so stray <, >, & in the model's prose (common in
+  // plain-text inequalities like "x < 5") can never be misread as HTML —
+  // only the tags inserted below are real markup.
+  text = escapeHtml(text);
+
   // Convert markdown-like formatting to HTML
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -1588,36 +1618,50 @@ function formatResponse(text) {
   text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
   text = text.replace(/^# (.+)$/gm, '<h3>$1</h3>');
-  // Convert bullet lists
+  // Bullet lists -> <ul> (runs first: "-"/"*" lines never match the
+  // numbered-list pattern below, so this can't touch numbered steps)
   text = text.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
   text = text.replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>');
-  // Convert numbered lists
-  text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Numbered lists -> <ol>, built as a complete block in one shot (this
+  // must run AFTER the bullet step above — otherwise the bullet step's
+  // generic "wrap consecutive <li>s" regex would also catch these <li>s
+  // and re-wrap them in a nested <ul>, which silently turns numbered
+  // steps into plain bullets since a nested <ul> overrides the parent
+  // <ol>'s numbering)
+  text = text.replace(/(?:^\d+\.\s+.+$\n?)+/gm, (block) => {
+    const items = block.trim().split('\n')
+      .map((line) => `<li>${line.replace(/^\d+\.\s+/, '')}</li>`)
+      .join('');
+    return `<ol>${items}</ol>\n`;
+  });
   // Line breaks
   text = text.replace(/\n\n/g, '<br><br>');
   text = text.replace(/\n/g, '<br>');
+
+  // Restore math verbatim for KaTeX to render
+  text = text.replace(/@@MATH(\d+)@@/g, (_, i) => mathBlocks[Number(i)]);
   return text;
 }
 
-// Replace common math words/LaTeX with compact symbols
-function symbolizeMath(s) {
-  if (!s) return s;
-  let out = String(s);
-  // handle LaTeX-like \frac{a}{b} and frac{a}{b}
-  out = out.replace(/\\?frac\s*\{\s*([^}]+)\s*\}\s*\{\s*([^}]+)\s*\}/g, (_, a, b) => `${a}⁄${b}`);
-  // handle frac(a,b)
-  out = out.replace(/frac\s*\(\s*([^,]+)\s*,\s*([^\)]+)\s*\)/g, (_, a, b) => `${a}⁄${b}`);
-  // sqrt{...} or sqrt(...)
-  out = out.replace(/\\?sqrt\s*\{\s*([^}]+)\s*\}/g, (_, a) => `√(${a})`);
-  out = out.replace(/\\?sqrt\s*\(\s*([^\)]+)\s*\)/g, (_, a) => `√(${a})`);
-  // common words -> symbols
-  out = out.replace(/\bpi\b/gi, 'π');
-  out = out.replace(/\btimes\b/gi, '×');
-  out = out.replace(/\bsqrt\b/gi, '√');
-  out = out.replace(/\btheta\b/gi, 'θ');
-  // replace textual degree symbol
-  out = out.replace(/\bdeg\b/gi, '°');
-  return out;
+// Typeset any \( \) / \[ \] LaTeX in an already-rendered message bubble.
+// Dollar-sign delimiters are intentionally not used — they collide with
+// plain currency amounts (e.g. an Economics answer mentioning "$21
+// trillion"), which is exactly what used to force the old code to strip
+// every "$" from every answer. The system prompt instructs the model to
+// use \( \) / \[ \] exclusively, so this is unambiguous.
+function renderMathIn(el) {
+  if (!el || typeof window.renderMathInElement !== 'function') return;
+  try {
+    window.renderMathInElement(el, {
+      delimiters: [
+        { left: '\\[', right: '\\]', display: true },
+        { left: '\\(', right: '\\)', display: false },
+      ],
+      throwOnError: false,
+    });
+  } catch (e) {
+    console.warn('KaTeX render failed:', e);
+  }
 }
 
 async function sendMessage() {
@@ -1692,15 +1736,14 @@ async function sendMessage() {
       }
     } else {
       const rawAnswer = data.choices?.[0]?.message?.content || 'No response received.';
-      // remove $ and / characters from answers per user preference
-      const sanitizedAnswer = String(rawAnswer).replace(/\$/g, '').replace(/\//g, '');
-      const symbolized = symbolizeMath(sanitizedAnswer);
-      const formatted = formatResponse(symbolized);
+      const sanitizedAnswer = String(rawAnswer);
+      const formatted = formatResponse(sanitizedAnswer);
       const qLabel = (q && q.trim())
         ? q.trim()
         : (payload.displayItems && payload.displayItems.length ? '[Attachments / media]' : 'Message');
       recordQaExchange(qaAnchorToken, qLabel, sanitizedAnswer, currentSubject);
-      addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(currentSubject)}</span>${formatted}`, qaAnchorToken);
+      const bub = addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(currentSubject)}</span>${formatted}`, qaAnchorToken);
+      renderMathIn(bub);
       chatHistory.push({ role: 'assistant', content: sanitizedAnswer });
       if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
     }
@@ -1776,9 +1819,10 @@ function toggleVisuals() {
 }
 
 async function ensureVisualsLoaded() {
-  // load Chart.js, KaTeX and html2canvas dynamically
+  // load Chart.js and html2canvas dynamically; KaTeX is already loaded
+  // globally in <head> for chat math rendering, so skip it here.
   await loadScriptOnce('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js');
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js');
+  if (!window.katex) await loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js');
   await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
 }
 
