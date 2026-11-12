@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
   <link rel="icon" href="icons.png" type="image/png">
-  <!-- KaTeX: renders LaTeX math in chat answers (not just the visuals tool) -->
+  <!-- KaTeX: renders LaTeX math in chat answers -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/contrib/auto-render.min.js"></script>
@@ -80,6 +80,14 @@ header{
 .clear-btn:hover{background:rgba(255,255,255,.22)}
 .clear-btn:active{transform:scale(.97)}
 .mobile-menu-btn{display:none}
+.user-badge{
+  background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+  color:#fff;padding:.45rem 1rem;border-radius:999px;font-size:.75rem;font-weight:700;
+  cursor:pointer;transition:background .2s,transform .15s;touch-action:manipulation;
+  white-space:nowrap;max-width:9rem;overflow:hidden;text-overflow:ellipsis;
+}
+.user-badge:hover{background:rgba(255,255,255,.3)}
+.user-badge:active{transform:scale(.97)}
 
 /* SUBJECT BAR */
 .subjects-bar{
@@ -101,6 +109,26 @@ header{
 }
 #subjectSelect:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.15)}
 
+/* Quick subject chips — scannable, platform-style subject picker that
+   mirrors #subjectSelect's options (built from them at init, so they can
+   never drift out of sync) */
+.subject-chips{
+  display:flex;gap:.45rem;overflow-x:auto;overscroll-behavior-x:contain;
+  padding:0 clamp(.55rem,2vw,1rem) .6rem;flex-shrink:0;
+  background:var(--surface);-webkit-overflow-scrolling:touch;
+}
+.subject-chips::-webkit-scrollbar{height:4px}
+.subject-chips::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.subject-chip{
+  flex-shrink:0;border:1.5px solid var(--border);background:var(--surface2);color:var(--dark);
+  padding:.4rem .9rem;border-radius:999px;font-size:.76rem;font-weight:600;cursor:pointer;
+  white-space:nowrap;transition:background .2s,border-color .2s,color .2s,transform .15s;
+  touch-action:manipulation;
+}
+.subject-chip:hover{border-color:var(--primary)}
+.subject-chip:active{transform:scale(.96)}
+.subject-chip.active{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border-color:transparent}
+
 /* API KEY MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
 .modal{
@@ -114,8 +142,8 @@ header{
 .modal p{color:var(--gray);font-size:.9rem;line-height:1.65;margin-bottom:1.1rem}
 .modal .steps{background:var(--surface2);border-radius:var(--radius-sm);padding:1rem;margin-bottom:1.1rem;font-size:.84rem;line-height:1.75;color:var(--dark);border:1px solid var(--border)}
 .modal .steps a{color:var(--primary);font-weight:600}
-.modal input{width:100%;border:2px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:.93rem;outline:none;transition:border-color .2s;margin-bottom:.75rem;font-family:inherit}
-.modal input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+.modal input,.modal select{width:100%;border:2px solid var(--border);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:.93rem;outline:none;transition:border-color .2s;margin-bottom:.75rem;font-family:inherit;background:#fff;color:var(--dark)}
+.modal input:focus,.modal select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
 .modal-btns{display:flex;gap:.6rem}
 .btn-primary{
   background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border:none;border-radius:var(--radius-sm);
@@ -486,59 +514,32 @@ body.history-drawer-open .history-sidebar{
   .header-text{display:flex;flex-direction:column;align-items:center;justify-content:center}
 }
 
-/* Visuals embedded UI styles */
-#visualsContainer{box-sizing:border-box}
-#visualsContainer h2{font-size:1.1rem;margin:0;color:var(--dark)}
-#visualsContainer section{box-shadow:0 6px 18px rgba(2,6,23,.04);border-radius:10px;padding:12px;background:#fff}
-#visualsContainer label{font-weight:800;display:block;margin-bottom:6px}
-#visualsContainer textarea,#visualsContainer input,#visualsContainer select{font:inherit}
-#visualsContainer .btn{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
-#visualsContainer .btn.secondary{background:#64748b}
-#visualsContainer .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
-#visualsContainer canvas{max-width:100%;height:auto;border-radius:8px}
-
-/* Graph canvas responsive sizing */
-#graphCanvas{width:100% !important;height:320px !important;max-height:56vh;display:block}
-@media(max-width:900px){
-  #graphCanvas{height:260px !important}
-}
-@media(max-width:480px){
-  #graphCanvas{height:220px !important}
-  #visualsContainer{height:62vh}
-}
-
-@media(max-width:900px){
-  #visualsContainer{height:70vh;padding:10px}
-  #visualsContainer .controls{flex-direction:column;align-items:stretch}
-  #visualsContainer textarea{min-height:120px}
-  #visualsContainer .row-mobile{flex-direction:column}
-  #visualsContainer label{font-size:.95rem}
-}
-
-@media(max-width:480px){
-  #visualsContainer{height:66vh;padding:8px}
-  #visualsContainer h2{font-size:1rem}
-  #visualsContainer .btn{width:100%;padding:10px}
-  #visualsContainer .btn.secondary{width:100%}
-}
-
-/* Close button for visuals modal — ensure visible on mobile/safe areas */
-#visualsCloseBtn{
-  position:fixed;
-  top:calc(14px + env(safe-area-inset-top));
-  right:calc(14px + env(safe-area-inset-right));
-  z-index:1400;
-  padding:0.55rem 0.8rem;
-  background:#000;color:#fff;border:none;border-radius:10px;font-size:1.05rem;box-shadow:0 8px 24px rgba(0,0,0,.28);
-  display:flex;align-items:center;justify-content:center;
-}
-
-@media(max-width:480px){
-  #visualsCloseBtn{top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));padding:.65rem .9rem;font-size:1.15rem;border-radius:10px}
-}
 </style>
 </head>
 <body>
+
+<!-- REGISTER / PROFILE MODAL -->
+<div class="modal-overlay" id="registerModal" style="display:none;">
+  <div class="modal">
+    <h2>🎓 Welcome to EduAI</h2>
+    <p>Tell us a little about yourself so EduAI can greet you by name and tailor answers to your level.</p>
+    <input type="text" id="regNameInput" placeholder="Your full name" autocomplete="name" maxlength="60">
+    <select id="regLevelInput">
+      <option value="">Your level (optional)</option>
+      <option value="Primary School">Primary School</option>
+      <option value="Junior Secondary (JSS)">Junior Secondary (JSS)</option>
+      <option value="Senior Secondary (SSS)">Senior Secondary (SSS)</option>
+      <option value="University">University</option>
+      <option value="Teacher / Educator">Teacher / Educator</option>
+      <option value="Other">Other</option>
+    </select>
+    <div class="modal-btns">
+      <button type="button" class="btn-primary" onclick="completeRegistration()">Get Started</button>
+    </div>
+    <p class="modal-note" id="registerResetNote" style="display:none;cursor:pointer;text-decoration:underline" onclick="resetProfile()">Not you? Reset profile on this device</p>
+    <p class="modal-note">📱 Saved on this device only, so EduAI remembers you next time you open it here.</p>
+  </div>
+</div>
 
 <!-- API KEY MODAL -->
 <div class="modal-overlay" id="apiModal">
@@ -560,113 +561,6 @@ body.history-drawer-open .history-sidebar{
   </div>
 </div>
 
-<!-- VISUALS MODAL (loads eduai_visuals.html in an iframe) -->
-<div class="modal-overlay" id="visualsModal" style="display:none;align-items:flex-start;padding-top:20px;">
-  <button type="button" id="visualsCloseBtn" onclick="closeVisuals()">✕</button>
-  <div class="modal" style="max-width:1100px;max-height:92vh;padding:0;overflow:hidden;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(255,255,255,.03),rgba(255,255,255,.02));">
-      <strong style="font-size:1rem;color:var(--dark)">EduAI Visuals</strong>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <button type="button" class="clear-btn" onclick="reloadVisuals()">⟳ <span>Reload</span></button>
-        <button type="button" class="clear-btn" onclick="closeVisuals()">✕ <span>Close</span></button>
-      </div>
-    </div>
-    <div id="visualsContainer" style="width:100%;height:82vh;overflow:auto;padding:14px;background:var(--surface2);">
-      <!-- Embedded visuals UI (charts, KaTeX, diagrams) -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <h2 style="margin:0">EduAI Visuals</h2>
-        <div style="color:var(--gray);font-size:.92rem">Interactive charts, formula rendering, and simple diagrams — exportable as images.</div>
-        <button type="button" class="clear-btn" style="margin-left:auto" onclick="closeVisuals()">✕ <span>Close</span></button>
-      </div>
-
-      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
-        <label style="font-weight:700">Chart Generator</label>
-        <div style="font-size:.85rem;color:#475569;margin-top:6px">Paste CSV (label,value) lines or use sample data.</div>
-        <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
-          <div style="flex:1;min-width:220px">
-            <textarea id="csvInput" rows="6" placeholder="e.g. Apples,10\nBananas,6\nCherries,14" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6"></textarea>
-            <div class="controls" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-              <select id="chartType"><option value="bar">Bar</option><option value="line">Line</option><option value="pie">Pie</option></select>
-              <button class="btn" id="genChart">Generate Chart</button>
-              <button class="btn" id="sampleData">Load Sample</button>
-              <button class="btn secondary" id="dlChart">Download Image</button>
-            </div>
-          </div>
-          <div style="flex:1;min-width:320px">
-            <canvas id="chartCanvas" width="640" height="360" style="background:#fff;border-radius:8px;border:1px solid #e6eef6"></canvas>
-          </div>
-        </div>
-      </section>
-
-      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
-        <label style="font-weight:700">Graph Plotter</label>
-        <div style="font-size:.85rem;color:#475569;margin-top:6px">Plot mathematical functions or scatter (x,y) points. For functions, use JavaScript/Math expressions with <code>x</code> (e.g. Math.sin(x), x*x, Math.log(x)).</div>
-        <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
-          <div style="flex:1;min-width:240px">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-              <select id="graphMode"><option value="function">Function</option><option value="scatter">Scatter</option></select>
-              <input id="funcInput" placeholder="e.g. Math.sin(x)" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6eef6">
-            </div>
-
-            <div id="functionControls" style="display:flex;gap:8px;align-items:center;margin-top:6px">
-              <input id="xminInput" placeholder="xmin" value="-6.28" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
-              <input id="xmaxInput" placeholder="xmax" value="6.28" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
-              <input id="stepInput" placeholder="steps" value="200" style="width:80px;padding:8px;border-radius:8px;border:1px solid #e6eef6">
-            </div>
-
-            <div id="scatterControls" style="display:none;margin-top:8px">
-              <textarea id="scatterInput" rows="6" placeholder="x,y per line\n0,0\n1,2\n2,3" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6"></textarea>
-            </div>
-
-            <div class="controls" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-              <button class="btn" id="plotGraph">Plot Graph</button>
-              <button class="btn secondary" id="dlGraph">Download Graph</button>
-            </div>
-          </div>
-          <div style="flex:1;min-width:320px">
-            <canvas id="graphCanvas" width="640" height="360" style="background:#fff;border-radius:8px;border:1px solid #e6eef6"></canvas>
-          </div>
-        </div>
-      </section>
-
-      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
-        <label style="font-weight:700">Math Formula Renderer (KaTeX)</label>
-        <div style="font-size:.85rem;color:#475569;margin-top:6px">Type LaTeX math (inline or display). Example: \(\frac{a}{b} = \sqrt{2}\)</div>
-        <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
-          <div style="flex:1;min-width:220px">
-            <input id="latexInput" placeholder="e.g. \frac{1}{2} \pi r^2" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef6">
-            <div class="controls" style="display:flex;gap:8px;align-items:center;margin-top:8px">
-              <button class="btn" id="renderLatex">Render Formula</button>
-              <button class="btn secondary" id="dlFormula">Download Formula</button>
-            </div>
-          </div>
-          <div style="flex:1;min-width:220px">
-            <div id="formulaOut" style="min-height:56px;padding:12px;border-radius:8px;border:1px dashed #e6eef6;background:#fff"></div>
-          </div>
-        </div>
-      </section>
-
-      <section style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px">
-        <label style="font-weight:700">Simple Diagram Canvas</label>
-        <div style="font-size:.85rem;color:#475569;margin-top:6px">A quick labeled sine wave diagram and atom sketch. Customize then export.</div>
-        <div class="row-mobile" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:center">
-          <div style="flex:1;min-width:220px">
-            <div class="controls" style="display:flex;gap:8px;align-items:center">
-              <button class="btn" id="drawSine">Draw Sine Wave</button>
-              <button class="btn" id="drawAtom">Draw Atom</button>
-              <button class="btn secondary" id="dlDiagram">Download Diagram</button>
-            </div>
-          </div>
-          <div style="flex:1;min-width:220px">
-            <canvas id="diagramCanvas" width="640" height="360" style="background:#fff;border:1px solid #eaeef6;border-radius:8px"></canvas>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  </div>
-</div>
-
 <header>
   <div class="logo">🎓</div>
   <div class="header-text">
@@ -674,15 +568,15 @@ body.history-drawer-open .history-sidebar{
     <p class="header-subtext">• Ask anything on any subject</p>
   </div>
   <div class="header-right">
+    <button type="button" class="user-badge" id="userBadge" onclick="openProfileMenu()" style="display:none"></button>
     <button type="button" class="history-toggle-btn" id="historyToggleBtn" onclick="toggleHistoryDrawer()" aria-expanded="false" aria-controls="historySidebar">📜 <span>History</span></button>
-    <button type="button" class="clear-btn" onclick="toggleVisuals()">🖼 <span>Visuals</span></button>
     <button type="button" class="clear-btn" onclick="clearChat()">🗑 <span>Clear chat</span></button>
     <!-- Mobile menu button and dropdown -->
     <button type="button" class="clear-btn mobile-menu-btn" id="mobileMenuBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleMobileMenu()">☰ <span>Menu</span></button>
     <div id="mobileMenu" class="mobile-menu" style="display:none;position:absolute;right:12px;top:56px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px;z-index:1200;">
       <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="toggleHistoryDrawer();toggleMobileMenu()">📜 History</button>
-      <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="toggleVisuals();toggleMobileMenu()">🖼 Visuals</button>
       <button type="button" class="mobile-menu-item" style="display:block;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="clearChat();toggleMobileMenu()">🗑 Clear chat</button>
+      <button type="button" class="mobile-menu-item" id="mobileMenuProfile" style="display:none;width:100%;text-align:left;padding:.45rem .6rem;border:none;background:transparent;cursor:pointer;border-radius:8px" onclick="openProfileMenu();toggleMobileMenu()">👤 Edit profile</button>
     </div>
   </div>
 </header>
@@ -718,6 +612,7 @@ body.history-drawer-open .history-sidebar{
     <option value="Technical Drawing">📏 Technical Drawing</option>
   </select>
 </div>
+<div class="subject-chips" id="subjectChips" role="tablist" aria-label="Quick subject picker"></div>
 
 <!-- Pronunciation panel (visible when English Language selected) -->
 <div id="pronunciationPanel" style="display:none;padding:.6rem clamp(.55rem,2vw,1rem);background:var(--surface);border-bottom:1px solid var(--border);">
@@ -786,6 +681,82 @@ let apiKey = resolveInitialApiKey();
 let currentSubject = 'General';
 let isLoading = false;
 let chatHistory = [];
+
+// ── User profile (name + level) — remembered on this device so EduAI can
+// greet returning students by name and calibrate answers to their level.
+// This is local-only (no backend/accounts): it's tied to this browser on
+// this device, not a portable login that works anywhere.
+const PROFILE_KEY = 'eduai_user_profile';
+
+function loadUserProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function saveUserProfile(profile) {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
+}
+
+let userProfile = loadUserProfile();
+
+function applyUserProfileToUI() {
+  const badge = document.getElementById('userBadge');
+  const mobileProfileItem = document.getElementById('mobileMenuProfile');
+  if (userProfile && userProfile.name) {
+    if (badge) {
+      badge.textContent = '👋 ' + userProfile.name.split(' ')[0];
+      badge.style.display = 'inline-flex';
+    }
+    if (mobileProfileItem) mobileProfileItem.style.display = 'block';
+  } else {
+    if (badge) badge.style.display = 'none';
+    if (mobileProfileItem) mobileProfileItem.style.display = 'none';
+  }
+}
+
+function showRegisterModal(isEditing) {
+  const modal = document.getElementById('registerModal');
+  if (!modal) return;
+  document.getElementById('regNameInput').value = (isEditing && userProfile) ? userProfile.name || '' : '';
+  document.getElementById('regLevelInput').value = (isEditing && userProfile) ? userProfile.level || '' : '';
+  const resetNote = document.getElementById('registerResetNote');
+  if (resetNote) resetNote.style.display = isEditing ? 'block' : 'none';
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('regNameInput').focus(), 50);
+}
+
+function completeRegistration() {
+  const name = document.getElementById('regNameInput').value.trim();
+  if (!name) {
+    alert('Please enter your name to continue.');
+    return;
+  }
+  const level = document.getElementById('regLevelInput').value;
+  const isReturning = !!userProfile;
+  userProfile = { name, level, since: (userProfile && userProfile.since) || Date.now() };
+  saveUserProfile(userProfile);
+  document.getElementById('registerModal').style.display = 'none';
+  applyUserProfileToUI();
+  if (!isReturning) {
+    init();
+  } else {
+    addMsg('ai', `<span class="subject-tag">✓ Profile updated</span>Got it — I'll call you <strong>${escapeHtml(name.split(' ')[0])}</strong> from now on.`);
+  }
+}
+
+function openProfileMenu() {
+  showRegisterModal(true);
+}
+
+function resetProfile() {
+  if (!confirm('Reset your profile on this device? EduAI will ask for your name again next time.')) return;
+  userProfile = null;
+  try { localStorage.removeItem(PROFILE_KEY); } catch (e) {}
+  document.getElementById('registerModal').style.display = 'none';
+  applyUserProfileToUI();
+}
 
 const QA_STORE_KEY = 'eduai_qa_history_v1';
 let qaHistory = [];
@@ -1471,6 +1442,19 @@ function addUserContentBubble(text, displayItems, anchorToken) {
 }
 
 function init() {
+  // Gate the whole app behind a one-time name/level registration, remembered
+  // on this device. Returning visitors skip straight past this.
+  if (!userProfile || !userProfile.name) {
+    document.getElementById('userInput').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    const ab0 = document.getElementById('attachBtn');
+    if (ab0) ab0.disabled = true;
+    showRegisterModal(false);
+    return;
+  }
+  applyUserProfileToUI();
+  buildSubjectChips();
+
   const modal = document.getElementById('apiModal');
   if (apiKey) {
     if (modal) modal.style.display = 'none';
@@ -1492,7 +1476,9 @@ function init() {
 function showWelcome() {
   const suggs = SUGGESTIONS['General'];
   const suggHtml = suggs.map(s => `<button type="button" class="sug-btn" onclick="askSuggestion('${escapeForOnclickQuote(s)}')">💡 ${s}</button>`).join('');
-  addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>Hello! I'm EduAI 👋</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more`);
+  const firstName = userProfile && userProfile.name ? userProfile.name.split(' ')[0] : '';
+  const greeting = firstName ? `Welcome back, ${escapeHtml(firstName)}! 👋` : `Hello! I'm EduAI 👋`;
+  addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>${greeting}</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more`);
 }
 
 function saveApiKey() {
@@ -1541,10 +1527,38 @@ function setSubject(subj) {
   currentSubject = subj;
   const sel = document.getElementById('subjectSelect');
   if (sel) sel.value = subj;
+  updateActiveSubjectChip();
   addMsg('ai', `<span class="subject-tag">📚 ${escapeHtml(subj)}</span><h3>Switched to ${escapeHtml(subj)}</h3>I'm now focused on <strong>${escapeHtml(subj)}</strong>. Ask me anything about this subject — from basics to advanced topics.`);
   // show pronunciation controls when English Language is selected
   const pronPanel = document.getElementById('pronunciationPanel');
   if (pronPanel) pronPanel.style.display = (subj === 'English Language') ? 'block' : 'none';
+}
+
+// Quick subject chips, built from #subjectSelect's own <option> list so
+// there's one source of truth for the subject list.
+function buildSubjectChips() {
+  const sel = document.getElementById('subjectSelect');
+  const wrap = document.getElementById('subjectChips');
+  if (!sel || !wrap || wrap.childElementCount) return; // already built
+  Array.from(sel.options).forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'subject-chip';
+    btn.setAttribute('role', 'tab');
+    btn.dataset.subject = opt.value;
+    btn.textContent = opt.textContent;
+    btn.addEventListener('click', () => setSubject(opt.value));
+    wrap.appendChild(btn);
+  });
+  updateActiveSubjectChip();
+}
+
+function updateActiveSubjectChip() {
+  document.querySelectorAll('.subject-chip').forEach((chip) => {
+    const isActive = chip.dataset.subject === currentSubject;
+    chip.classList.toggle('active', isActive);
+    chip.setAttribute('aria-selected', String(isActive));
+  });
 }
 
 function autoResize(el) {
@@ -1693,8 +1707,11 @@ async function sendMessage() {
   showTyping();
 
   try {
+    const profileNote = (userProfile && userProfile.name)
+      ? `\n\nThe student you're talking to is named ${userProfile.name}${userProfile.level ? `, studying at ${userProfile.level} level` : ''}. Address them by their first name occasionally (not in every message) and calibrate the depth/difficulty of your answer to their level when it's known.`
+      : '';
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT + currentSubject + '. Always give thorough, educational responses.' }
+      { role: 'system', content: SYSTEM_PROMPT + currentSubject + '. Always give thorough, educational responses.' + profileNote }
     ];
     const tail = chatHistory.slice(-10);
     tail.forEach((m, idx) => {
@@ -1776,196 +1793,6 @@ function clearChat() {
   clearPendingAttachments();
   closeHistoryDrawer();
   showWelcome();
-}
-
-// Visuals modal controls: open iframe lazily, reload, close
-let __eduai_visuals_loaded = false;
-async function openVisuals() {
-  const modal = document.getElementById('visualsModal');
-  const container = document.getElementById('visualsContainer');
-  if (!modal || !container) return;
-  modal.style.display = 'flex';
-  if (!__eduai_visuals_loaded) {
-    try {
-      await ensureVisualsLoaded();
-      setupVisualsHandlers();
-      __eduai_visuals_loaded = true;
-    } catch (e) {
-      console.error('Failed to load visuals libs', e);
-      alert('Could not load visuals tools. Check console for details.');
-    }
-  }
-}
-
-function closeVisuals() {
-  const modal = document.getElementById('visualsModal');
-  if (modal) modal.style.display = 'none';
-}
-
-async function reloadVisuals() {
-  // simple reload: remove canvases content and re-run setup
-  __eduai_visuals_loaded = false;
-  const modal = document.getElementById('visualsModal');
-  if (!modal) return;
-  closeVisuals();
-  setTimeout(() => openVisuals(), 120);
-}
-
-function toggleVisuals() {
-  const modal = document.getElementById('visualsModal');
-  if (!modal) return;
-  const isOpen = window.getComputedStyle(modal).display !== 'none';
-  if (isOpen) closeVisuals(); else openVisuals();
-}
-
-async function ensureVisualsLoaded() {
-  // load Chart.js and html2canvas dynamically; KaTeX is already loaded
-  // globally in <head> for chat math rendering, so skip it here.
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js');
-  if (!window.katex) await loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.7/dist/katex.min.js');
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
-}
-
-function setupVisualsHandlers() {
-  // Chart logic
-  let chart = null;
-  let graphChart = null;
-  function parseCSV(text){
-    const lines = String(text||'').trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-    const labels = [], values = [];
-    for(const ln of lines){
-      const parts = ln.split(',');
-      if(parts.length<2) continue;
-      labels.push(parts[0].trim());
-      const v = parseFloat(parts.slice(1).join(',').trim());
-      values.push(Number.isFinite(v)?v:0);
-    }
-    return {labels,values};
-  }
-
-  document.getElementById('sampleData').addEventListener('click', ()=>{
-    document.getElementById('csvInput').value = 'Apples,12\nBananas,8\nCherries,15\nDates,6';
-  });
-  document.getElementById('genChart').addEventListener('click', ()=>{
-    const raw = document.getElementById('csvInput').value;
-    const type = document.getElementById('chartType').value;
-    const parsed = parseCSV(raw);
-    if(!parsed.labels.length){ alert('Please paste CSV label,value lines or load sample data.'); return; }
-    const ctx = document.getElementById('chartCanvas').getContext('2d');
-    if(chart) chart.destroy();
-    chart = new Chart(ctx, {
-      type: type==='pie'?'pie':type,
-      data: { labels: parsed.labels, datasets: [{ label: 'Value', data: parsed.values, backgroundColor: parsed.labels.map((_,i)=>`hsl(${i*45 % 360} 70% 60%)`), borderColor:'#fff', borderWidth:1 }] },
-      options: { responsive:true, maintainAspectRatio:false }
-    });
-  });
-  document.getElementById('dlChart').addEventListener('click', async ()=>{
-    const node = document.getElementById('chartCanvas');
-    const blob = await html2canvas(node,{backgroundColor:null}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
-    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='chart.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-
-  // Graph Plotter handlers
-  function parseScatter(text){
-    const lines = String(text||'').trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-    const xs = [], ys = [];
-    for(const ln of lines){
-      const parts = ln.split(',');
-      if(parts.length<2) continue;
-      const x = parseFloat(parts[0].trim()), y = parseFloat(parts[1].trim());
-      if(Number.isFinite(x) && Number.isFinite(y)){ xs.push(x); ys.push(y); }
-    }
-    return {xs, ys};
-  }
-
-  function generateFunctionData(expr, xmin, xmax, steps){
-    const xs = [];
-    const ys = [];
-    const step = (xmax - xmin) / Math.max(1, steps-1);
-    for(let i=0;i<steps;i++){
-      const x = xmin + step * i;
-      let y = NaN;
-      try{ y = Function('x', 'with(Math){ return ' + expr + ' }')(x); }catch(e){ y = NaN }
-      if(!Number.isFinite(y)) y = NaN;
-      xs.push(x); ys.push(y);
-    }
-    return {xs, ys};
-  }
-
-  document.getElementById('graphMode').addEventListener('change', (e)=>{
-    const mode = e.target.value;
-    document.getElementById('functionControls').style.display = mode==='function' ? 'flex' : 'none';
-    document.getElementById('scatterControls').style.display = mode==='scatter' ? 'block' : 'none';
-  });
-
-  document.getElementById('plotGraph').addEventListener('click', ()=>{
-    const mode = document.getElementById('graphMode').value;
-    const ctx = document.getElementById('graphCanvas').getContext('2d');
-    if(graphChart) graphChart.destroy();
-    if(mode==='function'){
-      const expr = document.getElementById('funcInput').value.trim() || 'Math.sin(x)';
-      const xmin = parseFloat(document.getElementById('xminInput').value) || -6.28;
-      const xmax = parseFloat(document.getElementById('xmaxInput').value) || 6.28;
-      const steps = Math.max(10, parseInt(document.getElementById('stepInput').value) || 200);
-      const data = generateFunctionData(expr, xmin, xmax, steps);
-      const labels = data.xs.map(v=>Number.isFinite(v)?v.toFixed(3):'');
-      graphChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: labels, datasets: [{ label: expr, data: data.ys, borderColor: 'hsl(220 70% 50%)', backgroundColor:'rgba(79,70,229,0.08)', pointRadius:0 }] },
-        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{ title:{display:true,text:'x'} }, y:{ title:{display:true,text:'y'} } } }
-      });
-    } else {
-      const txt = document.getElementById('scatterInput').value;
-      const p = parseScatter(txt);
-      if(!p.xs.length){ alert('No valid scatter points found. Provide x,y per line.'); return; }
-      graphChart = new Chart(ctx, {
-        type: 'scatter',
-        data: { datasets: [{ label: 'Scatter', data: p.xs.map((x,i)=>({x: x, y: p.ys[i]})), backgroundColor:'hsl(10 80% 50%)' }] },
-        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{ type:'linear', position:'bottom', title:{display:true,text:'x'} }, y:{ title:{display:true,text:'y'} } } }
-      });
-    }
-  });
-
-  document.getElementById('dlGraph').addEventListener('click', async ()=>{
-    const node = document.getElementById('graphCanvas');
-    const blob = await html2canvas(node,{backgroundColor:null}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
-    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='graph.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-
-  // KaTeX render + download
-  document.getElementById('renderLatex').addEventListener('click', ()=>{
-    const tex = document.getElementById('latexInput').value || '';
-    const out = document.getElementById('formulaOut'); out.innerHTML='';
-    try{
-      katex.render(tex, out, {throwOnError:false, displayMode: false});
-    }catch(e){ out.textContent = 'Render error: '+e.message }
-  });
-  document.getElementById('dlFormula').addEventListener('click', async ()=>{
-    const node = document.getElementById('formulaOut');
-    if(!node.innerHTML.trim()){ alert('Render a formula first'); return; }
-    const blob = await html2canvas(node,{backgroundColor:'#fff'}).then(c=>new Promise(r=>c.toBlob(r,'image/png')));
-    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='formula.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-
-  // Diagram drawing
-  const dCanvas = document.getElementById('diagramCanvas');
-  const dCtx = dCanvas.getContext('2d');
-  function clearDiagram(){ dCtx.clearRect(0,0,dCanvas.width,dCanvas.height); dCtx.fillStyle='#fff'; dCtx.fillRect(0,0,dCanvas.width,dCanvas.height); }
-  function drawSine(){ clearDiagram(); const w=dCanvas.width, h=dCanvas.height; dCtx.strokeStyle='#0f172a'; dCtx.lineWidth=2; dCtx.beginPath(); for(let x=0;x<w;x++){ const t = x/w*4*Math.PI; const y = h/2 - Math.sin(t)*(h/4); if(x===0) dCtx.moveTo(x,y); else dCtx.lineTo(x,y); } dCtx.stroke(); dCtx.fillStyle='#0f172a'; dCtx.font='16px sans-serif'; dCtx.fillText('y = sin(x)',20,30); dCtx.strokeStyle='rgba(79,70,229,.45)'; dCtx.lineWidth=1; dCtx.beginPath(); dCtx.moveTo(0,h/2); dCtx.lineTo(w,h/2); dCtx.stroke(); }
-  function drawAtom(){ clearDiagram(); const cx=dCanvas.width/2, cy=dCanvas.height/2; dCtx.fillStyle='#fff'; dCtx.fillRect(0,0,dCanvas.width,dCanvas.height); dCtx.strokeStyle='#0f172a'; dCtx.lineWidth=2; for(let i=1;i<=3;i++){ dCtx.beginPath(); dCtx.ellipse(cx,cy,50*i,30*i, i*0.5,0,Math.PI*2); dCtx.stroke(); } dCtx.fillStyle='#ffb020'; dCtx.beginPath(); dCtx.arc(cx,cy,10,0,Math.PI*2); dCtx.fill(); dCtx.fillStyle='#0f172a'; dCtx.font='16px sans-serif'; dCtx.fillText('Nucleus',cx+15,cy+6); }
-  document.getElementById('drawSine').addEventListener('click', drawSine);
-  document.getElementById('drawAtom').addEventListener('click', drawAtom);
-  document.getElementById('dlDiagram').addEventListener('click', async ()=>{
-    const node = document.getElementById('diagramCanvas');
-    const blob = await new Promise(r=>node.toBlob(r,'image/png'));
-    if(!blob) return; const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='diagram.png'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-
-  // initial samples
-  document.getElementById('sampleData').click();
-  drawSine();
-  // pronunciation setup
-  try{ setupPronunciationUI(); }catch(e){console.warn('pronunciation UI init failed',e)}
 }
 
 // Pronunciation helpers: fetch IPA and audio from dictionaryapi.dev, fallback to SpeechSynthesis
@@ -2110,10 +1937,6 @@ function setupPronunciationUI(){
       const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }catch(e){ alert('Failed to save audio'); }
   });
-}
-
-function openVisualsNewTab() {
-  window.open('eduai_visuals.html', '_blank');
 }
 
 window.addEventListener('resize', () => {
