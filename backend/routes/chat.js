@@ -3,7 +3,12 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const ChatLog = require('../models/ChatLog');
 
-const MODEL = 'openrouter/free';
+// 'openrouter/free' auto-routes across OpenRouter's free pool, which
+// currently lands mostly on reasoning models — they "think" before every
+// reply, which is slow and can even burn the whole token budget on
+// reasoning alone (returning an empty answer). Pin to a specific fast,
+// non-reasoning free model instead, with reasoning explicitly disabled.
+const MODEL = 'nvidia/nemotron-3.5-lightning:free';
 const TEMPERATURE = 0.7;
 const MAX_TOKENS = 2048;
 const MAX_MESSAGES = 30;
@@ -71,6 +76,7 @@ router.post('/', chatLimiter, async (req, res, next) => {
         messages,
         temperature: TEMPERATURE,
         max_tokens: MAX_TOKENS,
+        reasoning: { enabled: false },
       }),
     });
 
