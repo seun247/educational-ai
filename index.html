@@ -541,26 +541,6 @@ body.history-drawer-open .history-sidebar{
   </div>
 </div>
 
-<!-- API KEY MODAL -->
-<div class="modal-overlay" id="apiModal">
-  <div class="modal">
-    <h2>🔑 Connect to OpenRouter AI</h2>
-    <p>EduAI uses <strong>OpenRouter</strong> (free) to power answers across all subjects using top AI models.</p>
-    <div class="steps">
-      <b>Get your free API key:</b><br>
-      1. Go to <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a><br>
-      2. Sign up free<br>
-      3. Click <b>"Create Key"</b><br>
-      4. Copy and paste it below
-    </div>
-    <input type="password" id="apiKeyInput" placeholder="Paste your OpenRouter key (sk-or-...)" autocomplete="off">
-    <div class="modal-btns">
-      <button type="button" class="btn-primary" onclick="saveApiKey()">Connect &amp; Start Learning</button>
-    </div>
-    <p class="modal-note">🔒 Your key is stored only in your browser. Never shared.</p>
-  </div>
-</div>
-
 <header>
   <div class="logo">🎓</div>
   <div class="header-text">
@@ -653,31 +633,29 @@ body.history-drawer-open .history-sidebar{
 </div>
 
 <script>
-// Previously the file included a bundled key; restore a safe placeholder. Replace with your real key if needed.
-const BUNDLED_OPENROUTER_KEY = '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';
-// Ensure the key is available in localStorage so the setup modal does not appear.
-try{
-  if(!localStorage.getItem('eduai_or_key')){
-    localStorage.setItem('eduai_or_key', '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');
-  }
-}catch(e){}
-// In case the modal is still visible due to timing or caching, hide it on DOM ready
-try{
-  document.addEventListener('DOMContentLoaded', ()=>{
-    try{
-      const m = document.getElementById('apiModal'); if(m) m.style.display = 'none';
-    }catch(e){}
-    try{ const ui = document.getElementById('userInput'); if(ui) ui.disabled = false; const sb = document.getElementById('sendBtn'); if(sb) sb.disabled = false; }catch(e){}
-  });
-}catch(e){}
+// The OpenRouter key now lives only on the backend proxy — the browser
+// never sees it. Point this at the backend: localhost while developing,
+// the deployed Render URL in production.
+const BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000'
+  : 'https://educational-ai-3iul.onrender.com';
 
-function resolveInitialApiKey() {
-  const bundled = String(BUNDLED_OPENROUTER_KEY || '').trim();
-  if (bundled.startsWith('sk-or-')) return bundled;
-  return localStorage.getItem('eduai_or_key') || '';
+// A random id generated once per browser (not a login) so the backend can
+// tie usage/profile data to "this device" without any password.
+function getDeviceId() {
+  const STORAGE_KEY = 'eduai_device_id';
+  try {
+    let id = localStorage.getItem(STORAGE_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(STORAGE_KEY, id);
+    }
+    return id;
+  } catch (e) {
+    return 'no-storage';
+  }
 }
 
-let apiKey = resolveInitialApiKey();
 let currentSubject = 'General';
 let isLoading = false;
 let chatHistory = [];
@@ -697,6 +675,18 @@ function loadUserProfile() {
 
 function saveUserProfile(profile) {
   try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
+}
+
+// Fire-and-forget: the local profile is the source of truth for the UI,
+// so a failed/slow sync here must never block registration.
+function syncProfileToBackend(profile) {
+  try {
+    fetch(`${BACKEND_URL}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: getDeviceId(), name: profile.name, level: profile.level }),
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 let userProfile = loadUserProfile();
@@ -737,6 +727,7 @@ function completeRegistration() {
   const isReturning = !!userProfile;
   userProfile = { name, level, since: (userProfile && userProfile.since) || Date.now() };
   saveUserProfile(userProfile);
+  syncProfileToBackend(userProfile);
   document.getElementById('registerModal').style.display = 'none';
   applyUserProfileToUI();
   if (!isReturning) {
@@ -1454,19 +1445,7 @@ function init() {
   }
   applyUserProfileToUI();
   buildSubjectChips();
-
-  const modal = document.getElementById('apiModal');
-  if (apiKey) {
-    if (modal) modal.style.display = 'none';
-    setConnected(true);
-    enableInput();
-  } else {
-    if (modal) modal.style.display = 'flex';
-    document.getElementById('userInput').disabled = true;
-    document.getElementById('sendBtn').disabled = true;
-    const ab0 = document.getElementById('attachBtn');
-    if (ab0) ab0.disabled = true;
-  }
+  enableInput();
   qaHistory = loadQaHistoryFromStorage();
   renderHistorySidebar();
   try{ setupPronunciationUI(); }catch(e){/* ignore if not yet defined */}
@@ -1479,36 +1458,6 @@ function showWelcome() {
   const firstName = userProfile && userProfile.name ? userProfile.name.split(' ')[0] : '';
   const greeting = firstName ? `Welcome back, ${escapeHtml(firstName)}! 👋` : `Hello! I'm EduAI 👋`;
   addMsg('ai', `<span class="subject-tag">🎓 Welcome</span><h3>${greeting}</h3>I can answer <strong>any question on any subject</strong> — from primary school to university level.<br><br>I can help with:<br>• Step-by-step maths solutions<br>• Science explanations with formulas<br>• Essay writing and English grammar<br>• History, Geography, Economics and more`);
-}
-
-function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  if (!key || !key.startsWith('sk-or-')) {
-    alert('Please enter a valid OpenRouter API key (starts with sk-or-...)');
-    return;
-  }
-  apiKey = key;
-  localStorage.setItem('eduai_or_key', key);
-  const modal = document.getElementById('apiModal');
-  if (modal) modal.style.display = 'none';
-  setConnected(true);
-  enableInput();
-  addMsg('ai', '<span class="subject-tag">✓ Connected</span><h3>OpenRouter connected!</h3>You\'re now powered by <strong>OpenRouter</strong>. Ask me anything on any subject!');
-}
-
-function closeModal() {
-  const modal = document.getElementById('apiModal');
-  if (modal) modal.style.display = 'none';
-  addMsg('ai', '<span class="subject-tag">⚠️ Demo Mode</span><h3>No API key</h3>To unlock full AI-powered answers, enter your OpenRouter key in the setup dialog.');
-}
-
-function showModal() {
-  const modal = document.getElementById('apiModal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function setConnected(ok) {
-  // status badge removed — no UI update needed
 }
 
 function enableInput() {
@@ -1695,11 +1644,6 @@ async function sendMessage() {
   addUserContentBubble(q, payload.displayItems, qaAnchorToken);
   chatHistory.push({ role: 'user', content: payload.historySummary });
 
-  if (!apiKey) {
-    addMsg('ai', '<span class="subject-tag">⚠️ No API Key</span>Add your OpenRouter key in the setup dialog to unlock full answers.');
-    return;
-  }
-
   isLoading = true;
   document.getElementById('sendBtn').disabled = true;
   const attachBtn = document.getElementById('attachBtn');
@@ -1722,19 +1666,15 @@ async function sendMessage() {
       });
     });
 
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(`${BACKEND_URL}/api/chat`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://eduai.app',
-        'X-Title': 'EduAI'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'openrouter/free',
         messages,
-        temperature: 0.7,
-        max_tokens: 2048
+        subject: currentSubject,
+        deviceId: getDeviceId()
       })
     });
 
@@ -1743,11 +1683,10 @@ async function sendMessage() {
 
     if (data.error) {
       const errMsg = data.error.message || 'API error';
-      if (errMsg.includes('invalid_api_key') || errMsg.includes('Unauthorized')) {
-        setConnected(false);
-        addMsg('ai', '<span class="subject-tag">❌ Invalid Key</span><h3>API Key Error</h3>Your OpenRouter API key is invalid. Update <strong>BUNDLED_OPENROUTER_KEY</strong> in this file or enter a new key when the setup dialog appears.');
-      } else if (errMsg.includes('rate_limit') || errMsg.includes('quota')) {
-        addMsg('ai', `<span class="subject-tag">⏳ Rate Limit</span><h3>Too many requests</h3>Please wait a moment and try again.<br><br><button type="button" class="sug-btn" onclick="showModal()" style="background:var(--primary);color:#fff;border-color:var(--primary)">🔑 Update API Key</button>`);
+      if (errMsg.includes('rate_limit') || errMsg.includes('quota') || res.status === 429) {
+        addMsg('ai', `<span class="subject-tag">⏳ Rate Limit</span><h3>Too many requests</h3>Please wait a moment and try again.`);
+      } else if (res.status === 503) {
+        addMsg('ai', `<span class="subject-tag">❌ Unavailable</span><h3>EduAI is temporarily unavailable</h3>${escapeHtml(errMsg)}`);
       } else {
         addMsg('ai', `<span class="subject-tag">❌ Error</span><h3>Something went wrong</h3>${escapeHtml(errMsg)}`);
       }
@@ -1777,11 +1716,7 @@ async function sendMessage() {
 
 function askSuggestion(q) {
   document.getElementById('userInput').value = q;
-  if (apiKey) sendMessage();
-  else {
-    addMsg('user', q);
-    addMsg('ai', '<span class="subject-tag">⚠️ No API Key</span>Add your OpenRouter key in the setup dialog to unlock full answers.');
-  }
+  sendMessage();
 }
 
 function clearChat() {
