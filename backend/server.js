@@ -49,4 +49,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 EduAI backend running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  ['MONGODB_URI', 'OPENROUTER_API_KEY', 'JWT_SECRET', 'FRONTEND_URL'].forEach((key) => {
+    console.log(`   ${process.env[key] ? '✅' : '❌ MISSING'} ${key}`);
+  });
 });
