@@ -518,11 +518,38 @@ body.history-drawer-open .history-sidebar{
 </head>
 <body>
 
-<!-- REGISTER / PROFILE MODAL -->
-<div class="modal-overlay" id="registerModal" style="display:none;">
+<!-- AUTH MODAL (sign up / log in) -->
+<div class="modal-overlay" id="authModal" style="display:none;">
   <div class="modal">
     <h2>🎓 Welcome to EduAI</h2>
-    <p>Tell us a little about yourself so EduAI can greet you by name and tailor answers to your level.</p>
+    <p>Sign up or log in so EduAI can remember you and your level across visits.</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button type="button" id="authTabSignup" onclick="setAuthMode('signup')" style="flex:1;border:2px solid var(--border);border-radius:var(--radius-sm);padding:.6rem;font-size:.9rem;font-weight:700;cursor:pointer;background:#fff;color:var(--dark);transition:background .2s,color .2s">Sign Up</button>
+      <button type="button" id="authTabLogin" onclick="setAuthMode('login')" style="flex:1;border:2px solid var(--border);border-radius:var(--radius-sm);padding:.6rem;font-size:.9rem;font-weight:700;cursor:pointer;background:#fff;color:var(--dark);transition:background .2s,color .2s">Log In</button>
+    </div>
+    <input type="text" id="authNameInput" placeholder="Your full name" autocomplete="name" maxlength="60">
+    <select id="authLevelInput">
+      <option value="">Your level (optional)</option>
+      <option value="Primary School">Primary School</option>
+      <option value="Junior Secondary (JSS)">Junior Secondary (JSS)</option>
+      <option value="Senior Secondary (SSS)">Senior Secondary (SSS)</option>
+      <option value="University">University</option>
+      <option value="Teacher / Educator">Teacher / Educator</option>
+      <option value="Other">Other</option>
+    </select>
+    <input type="email" id="authEmailInput" placeholder="Email address" autocomplete="email">
+    <input type="password" id="authPasswordInput" placeholder="Password (min 6 characters)" autocomplete="current-password">
+    <div class="modal-btns">
+      <button type="button" class="btn-primary" id="authSubmitBtn" onclick="submitAuth()">Sign Up</button>
+    </div>
+    <p class="modal-note" id="authError" style="display:none;color:#c0392b"></p>
+  </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal" style="display:none;">
+  <div class="modal">
+    <h2>👤 Your Profile</h2>
     <input type="text" id="regNameInput" placeholder="Your full name" autocomplete="name" maxlength="60">
     <select id="regLevelInput">
       <option value="">Your level (optional)</option>
@@ -534,10 +561,9 @@ body.history-drawer-open .history-sidebar{
       <option value="Other">Other</option>
     </select>
     <div class="modal-btns">
-      <button type="button" class="btn-primary" onclick="completeRegistration()">Get Started</button>
+      <button type="button" class="btn-primary" onclick="saveProfileEdits()">Save</button>
     </div>
-    <p class="modal-note" id="registerResetNote" style="display:none;cursor:pointer;text-decoration:underline" onclick="resetProfile()">Not you? Reset profile on this device</p>
-    <p class="modal-note">📱 Saved on this device only, so EduAI remembers you next time you open it here.</p>
+    <p class="modal-note" style="cursor:pointer;text-decoration:underline" onclick="logout()">🚪 Log out</p>
   </div>
 </div>
 
@@ -660,11 +686,10 @@ let currentSubject = 'General';
 let isLoading = false;
 let chatHistory = [];
 
-// ── User profile (name + level) — remembered on this device so EduAI can
-// greet returning students by name and calibrate answers to their level.
-// This is local-only (no backend/accounts): it's tied to this browser on
-// this device, not a portable login that works anywhere.
+// ── User profile (name + level) — comes from a real signed-in account now,
+// restored on load via the stored session token, not just a local guess.
 const PROFILE_KEY = 'eduai_user_profile';
+const AUTH_TOKEN_KEY = 'eduai_auth_token';
 
 function loadUserProfile() {
   try {
@@ -677,19 +702,9 @@ function saveUserProfile(profile) {
   try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
 }
 
-// Fire-and-forget: the local profile is the source of truth for the UI,
-// so a failed/slow sync here must never block registration.
-function syncProfileToBackend(profile) {
-  try {
-    fetch(`${BACKEND_URL}/api/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deviceId: getDeviceId(), name: profile.name, level: profile.level }),
-    }).catch(() => {});
-  } catch (e) {}
-}
-
 let userProfile = loadUserProfile();
+let authToken = (() => { try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; } catch (e) { return null; } })();
+let authMode = 'signup';
 
 function applyUserProfileToUI() {
   const badge = document.getElementById('userBadge');
@@ -706,47 +721,121 @@ function applyUserProfileToUI() {
   }
 }
 
-function showRegisterModal(isEditing) {
-  const modal = document.getElementById('registerModal');
-  if (!modal) return;
-  document.getElementById('regNameInput').value = (isEditing && userProfile) ? userProfile.name || '' : '';
-  document.getElementById('regLevelInput').value = (isEditing && userProfile) ? userProfile.level || '' : '';
-  const resetNote = document.getElementById('registerResetNote');
-  if (resetNote) resetNote.style.display = isEditing ? 'block' : 'none';
-  modal.style.display = 'flex';
-  setTimeout(() => document.getElementById('regNameInput').focus(), 50);
+// Tries to restore a session from a token saved on a previous visit.
+// Returns true if a valid session was restored.
+async function restoreSession() {
+  if (!authToken) return false;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    if (!res.ok) throw new Error('invalid session');
+    const data = await res.json();
+    userProfile = { name: data.data.name, level: data.data.level, email: data.data.email };
+    saveUserProfile(userProfile);
+    return true;
+  } catch (e) {
+    authToken = null;
+    try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e2) {}
+    return false;
+  }
 }
 
-function completeRegistration() {
+function setAuthMode(mode) {
+  authMode = mode;
+  const isSignup = mode === 'signup';
+  document.getElementById('authTabSignup').style.background = isSignup ? 'var(--primary)' : '';
+  document.getElementById('authTabSignup').style.color = isSignup ? '#fff' : '';
+  document.getElementById('authTabLogin').style.background = !isSignup ? 'var(--primary)' : '';
+  document.getElementById('authTabLogin').style.color = !isSignup ? '#fff' : '';
+  document.getElementById('authNameInput').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('authLevelInput').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('authSubmitBtn').textContent = isSignup ? 'Sign Up' : 'Log In';
+  const err = document.getElementById('authError');
+  if (err) err.style.display = 'none';
+}
+
+function showAuthError(message) {
+  const err = document.getElementById('authError');
+  if (!err) return;
+  err.textContent = message;
+  err.style.display = 'block';
+}
+
+async function submitAuth() {
+  const email = document.getElementById('authEmailInput').value.trim();
+  const password = document.getElementById('authPasswordInput').value;
+  const isSignup = authMode === 'signup';
+  const name = document.getElementById('authNameInput').value.trim();
+  const level = document.getElementById('authLevelInput').value;
+
+  if (!email || !password) { showAuthError('Please enter your email and password.'); return; }
+  if (isSignup && !name) { showAuthError('Please enter your name.'); return; }
+
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/${isSignup ? 'register' : 'login'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isSignup ? { name, level, email, password } : { email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showAuthError(data.message || 'Something went wrong. Please try again.');
+      return;
+    }
+    authToken = data.token;
+    try { localStorage.setItem(AUTH_TOKEN_KEY, authToken); } catch (e) {}
+    userProfile = { name: data.data.name, level: data.data.level, email: data.data.email };
+    saveUserProfile(userProfile);
+    document.getElementById('authModal').style.display = 'none';
+    applyUserProfileToUI();
+    init();
+  } catch (e) {
+    showAuthError('Network error. Please check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openProfileMenu() {
+  const modal = document.getElementById('profileModal');
+  if (!modal) return;
+  document.getElementById('regNameInput').value = userProfile ? userProfile.name || '' : '';
+  document.getElementById('regLevelInput').value = userProfile ? userProfile.level || '' : '';
+  modal.style.display = 'flex';
+}
+
+async function saveProfileEdits() {
   const name = document.getElementById('regNameInput').value.trim();
   if (!name) {
     alert('Please enter your name to continue.');
     return;
   }
   const level = document.getElementById('regLevelInput').value;
-  const isReturning = !!userProfile;
-  userProfile = { name, level, since: (userProfile && userProfile.since) || Date.now() };
+  userProfile = { ...userProfile, name, level };
   saveUserProfile(userProfile);
-  syncProfileToBackend(userProfile);
-  document.getElementById('registerModal').style.display = 'none';
+  document.getElementById('profileModal').style.display = 'none';
   applyUserProfileToUI();
-  if (!isReturning) {
-    init();
-  } else {
-    addMsg('ai', `<span class="subject-tag">✓ Profile updated</span>Got it — I'll call you <strong>${escapeHtml(name.split(' ')[0])}</strong> from now on.`);
+  addMsg('ai', `<span class="subject-tag">✓ Profile updated</span>Got it — I'll call you <strong>${escapeHtml(name.split(' ')[0])}</strong> from now on.`);
+
+  if (authToken) {
+    try {
+      await fetch(`${BACKEND_URL}/api/auth/me`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ name, level })
+      });
+    } catch (e) {}
   }
 }
 
-function openProfileMenu() {
-  showRegisterModal(true);
-}
-
-function resetProfile() {
-  if (!confirm('Reset your profile on this device? EduAI will ask for your name again next time.')) return;
-  userProfile = null;
+function logout() {
+  if (!confirm('Log out of EduAI?')) return;
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) {}
   try { localStorage.removeItem(PROFILE_KEY); } catch (e) {}
-  document.getElementById('registerModal').style.display = 'none';
-  applyUserProfileToUI();
+  location.reload();
 }
 
 const QA_STORE_KEY = 'eduai_qa_history_v1';
@@ -1432,16 +1521,21 @@ function addUserContentBubble(text, displayItems, anchorToken) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-function init() {
-  // Gate the whole app behind a one-time name/level registration, remembered
-  // on this device. Returning visitors skip straight past this.
+async function init() {
+  // Gate the whole app behind a real sign-in. If a profile isn't already
+  // loaded (e.g. fresh page load), try to restore the session from a saved
+  // token before falling back to the sign-up/login screen.
   if (!userProfile || !userProfile.name) {
-    document.getElementById('userInput').disabled = true;
-    document.getElementById('sendBtn').disabled = true;
-    const ab0 = document.getElementById('attachBtn');
-    if (ab0) ab0.disabled = true;
-    showRegisterModal(false);
-    return;
+    const restored = await restoreSession();
+    if (!restored) {
+      document.getElementById('userInput').disabled = true;
+      document.getElementById('sendBtn').disabled = true;
+      const ab0 = document.getElementById('attachBtn');
+      if (ab0) ab0.disabled = true;
+      setAuthMode('signup');
+      document.getElementById('authModal').style.display = 'flex';
+      return;
+    }
   }
   applyUserProfileToUI();
   buildSubjectChips();

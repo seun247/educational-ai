@@ -1,18 +1,29 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
-// EduAI has no password-based login — the frontend generates a random
-// deviceId (crypto.randomUUID) on first visit and stores it in
-// localStorage, then syncs the student's name/level here keyed by that
-// id. This lets the registration the student already sees (name once,
-// remembered after) also live server-side for basic usage visibility —
-// it is still tied to one browser/device, not a portable account.
+// Real accounts: email + password, so a student's profile follows them to
+// any browser/device instead of being stuck to one (deviceId is kept only
+// for the older device-tied flow / chat usage logging, not required here).
 const UserSchema = new mongoose.Schema(
   {
     deviceId: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       index: true,
+    },
+    email: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
+    },
+    password: {
+      type: String,
+      minlength: [6, 'Password must be at least 6 characters'],
+      select: false,
     },
     name: {
       type: String,
@@ -32,5 +43,15 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+UserSchema.pre('save', async function hashPassword(next) {
+  if (!this.isModified('password') || !this.password) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+UserSchema.methods.comparePassword = function comparePassword(candidate) {
+  return bcrypt.compare(candidate, this.password);
+};
 
 module.exports = mongoose.model('User', UserSchema);

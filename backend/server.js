@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const chatRoutes = require('./routes/chat');
-const userRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth');
 
 connectDB();
 
@@ -38,7 +38,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/chat', chatRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
